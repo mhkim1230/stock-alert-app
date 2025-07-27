@@ -4,7 +4,7 @@
 fastapi==0.115.14
 uvicorn[standard]==0.32.1
 
-# 데이터베이스 (PostgreSQL - SQLAlchemy 1.4 호환)
+# 데이터베이스 (PostgreSQL - Python 3.9 호환)
 sqlalchemy==1.4.53
 psycopg2-binary==2.9.9
 

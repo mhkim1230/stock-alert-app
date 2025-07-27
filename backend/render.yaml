@@ -14,22 +14,28 @@ services:
     envVars:
       - key: DEBUG
         value: false
-      - key: ENABLE_CACHING
+      - key: PYTHON_VERSION
+        value: "3.9"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stock-alert-db
+          property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: APNS_KEY_ID
+        sync: false
+      - key: APNS_TEAM_ID
+        sync: false
+      - key: APNS_BUNDLE_ID
+        value: com.stockalert.app
+      - key: APNS_KEY_PATH
+        sync: false
+      - key: APNS_SANDBOX
         value: true
-      - key: CACHE_TIMEOUT
-        value: 300
-      - key: MAX_RETRIES
-        value: 3
-      - key: REQUEST_TIMEOUT
-        value: 10
-      - key: MIN_REQUEST_DELAY
-        value: 1.0
-      - key: MAX_REQUEST_DELAY
-        value: 3.0
-      - key: LOG_LEVEL
-        value: INFO
-      - key: SECRET_KEY
-        generateValue: true
-      - key: APNS_USE_SANDBOX
-        value: true
+      - key: NAVER_CLIENT_ID
+        sync: false
+      - key: NAVER_CLIENT_SECRET
+        sync: false
     healthCheckPath: /health 
