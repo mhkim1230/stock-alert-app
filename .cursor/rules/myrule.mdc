@@ -1,0 +1,9 @@
+---
+description: 
+globs: *.py
+alwaysApply: false
+---
+-sequential-thinking (mcp) 사용하여 소스를 분석하고 수정하고 생성한다. 
+- 하드코딩하지말것
+- 소스 지우기전에 나한테 먼저 확인 받기 
+

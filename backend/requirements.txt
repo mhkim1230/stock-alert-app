@@ -1,0 +1,59 @@
+# 클라우드 배포용 주식 알림 시스템 - 핵심 의존성
+
+# 웹 프레임워크 (최신 안정 버전)
+fastapi==0.115.14
+uvicorn[standard]==0.32.1
+
+# 데이터베이스 (PostgreSQL 우선, SQLite 백업)
+sqlalchemy==1.4.53
+psycopg2-binary==2.9.9
+asyncpg==0.29.0
+
+# 웹 스크래핑 및 파싱
+beautifulsoup4==4.13.4
+requests==2.32.3
+lxml==5.4.1
+html5lib==1.1
+
+# HTTP 클라이언트
+aiohttp==3.12.13
+httpx==0.27.0
+
+# RSS/피드 파싱
+feedparser==6.0.11
+
+# 환경 설정
+python-dotenv==1.0.1
+pydantic==1.10.19
+
+# 로깅
+colorlog==6.9.0
+
+# 인증 및 보안
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.20
+bcrypt==4.3.0
+
+# 푸시 알림 (iOS APNs)
+apns2==0.7.2
+
+# 스케줄링
+apscheduler==3.11.0
+
+# 템플릿 및 파일 처리
+jinja2==3.1.5
+aiofiles==24.1.0
+
+# 금융 데이터
+yfinance==0.2.52
+forex-python==1.9.2
+
+# 개발 및 테스트
+pytest==8.3.8
+pytest-asyncio==0.25.3
+coverage==7.9.1
+
+# 추가 유틸리티
+python-dateutil==2.9.0
+pytz==2024.2

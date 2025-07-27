@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: stock-alert-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: |
+      cd backend
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: |
+      cd backend
+      python -m uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DEBUG
+        value: false
+      - key: ENABLE_CACHING
+        value: true
+      - key: CACHE_TIMEOUT
+        value: 300
+      - key: MAX_RETRIES
+        value: 3
+      - key: REQUEST_TIMEOUT
+        value: 10
+      - key: MIN_REQUEST_DELAY
+        value: 1.0
+      - key: MAX_REQUEST_DELAY
+        value: 3.0
+      - key: LOG_LEVEL
+        value: INFO
+      - key: SECRET_KEY
+        generateValue: true
+      - key: APNS_USE_SANDBOX
+        value: true
+    healthCheckPath: /health 

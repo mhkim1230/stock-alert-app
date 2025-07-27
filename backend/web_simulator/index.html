@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📱 MY 증권</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #f8f9fa;
+            color: #1a1a1a;
+            line-height: 1.5;
+        }
+        
+        .app-container { 
+            max-width: 428px; 
+            margin: 0 auto; 
+            background: white;
+            min-height: 100vh;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        
+        .top-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 50px 20px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .top-bar h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .top-bar p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .tab-nav {
+            background: white;
+            border-bottom: 1px solid #f1f3f4;
+            display: flex;
+            position: sticky;
+            top: 89px;
+            z-index: 99;
+        }
+        
+        .tab-btn {
+            flex: 1;
+            padding: 16px 8px;
+            background: none;
+            border: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #8e8e93;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .tab-btn.active {
+            color: #667eea;
+        }
+        
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 20px;
+            padding-bottom: 100px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .section {
+            margin-bottom: 32px;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        
+        .add-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .add-btn:hover {
+            background: #5a67d8;
+        }
+        
+        .stock-card, .alert-card, .news-card {
+            background: white;
+            border: 1px solid #f1f3f4;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .stock-card:hover, .alert-card:hover, .news-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+        }
+        
+        .stock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        
+        .stock-info h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 2px;
+        }
+        
+        .stock-info p {
+            font-size: 0.8rem;
+            color: #8e8e93;
+        }
+        
+        .stock-price {
+            text-align: right;
+        }
+        
+        .price {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+        
+        .change {
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-top: 2px;
+        }
+        
+        .positive { color: #ff6b35; }
+        .negative { color: #3182f6; }
+        
+        .stock-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px solid #f8f9fa;
+        }
+        
+        .alert-status {
+            font-size: 0.75rem;
+            color: #8e8e93;
+        }
+        
+        .alert-active {
+            color: #ff6b35;
+            font-weight: 500;
+        }
+        
+        .action-btns {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-small {
+            background: #f8f9fa;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 0.75rem;
+            color: #6c757d;
+            cursor: pointer;
+        }
+        
+        .btn-small:hover {
+            background: #e9ecef;
+        }
+        
+        .btn-alert {
+            background: #fff5f5;
+            color: #ff6b35;
+        }
+        
+        .btn-alert:hover {
+            background: #fee2e2;
+        }
+        
+        /* 알림 카드 스타일 */
+        .alert-card {
+            border-left: 4px solid #667eea;
+        }
+        
+        .alert-card h4 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+        
+        .alert-condition {
+            font-size: 0.8rem;
+            color: #667eea;
+            margin-bottom: 4px;
+        }
+        
+        .alert-time {
+            font-size: 0.7rem;
+            color: #8e8e93;
+        }
+        
+        /* 뉴스 카드 스타일 */
+        .news-card {
+            cursor: pointer;
+        }
+        
+        .news-header {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .news-image {
+            width: 60px;
+            height: 60px;
+            background: #f1f3f4;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: #8e8e93;
+        }
+        
+        .news-content {
+            flex: 1;
+        }
+        
+        .news-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            line-height: 1.4;
+            margin-bottom: 4px;
+        }
+        
+        .news-summary {
+            font-size: 0.8rem;
+            color: #8e8e93;
+            line-height: 1.3;
+            margin-bottom: 8px;
+        }
+        
+        .news-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.7rem;
+            color: #8e8e93;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #8e8e93;
+        }
+        
+        .empty-state i {
+            font-size: 2rem;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+        
+        /* 모달 스타일 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #8e8e93;
+            cursor: pointer;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+        
+        .form-input, .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn-primary {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+        
+        .search-results {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+        
+        .search-item {
+            padding: 12px;
+            border-bottom: 1px solid #f8f9fa;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .search-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .search-item:last-child {
+            border-bottom: none;
+        }
+        
+        .search-info h4 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 2px;
+        }
+        
+        .search-info p {
+            font-size: 0.8rem;
+            color: #8e8e93;
+        }
+        
+        .search-price {
+            text-align: right;
+            font-size: 0.8rem;
+            color: #1a1a1a;
+        }
+        
+        /* 토스트 알림 */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a1a1a;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="top-bar">
+            <h1>MY 증권</h1>
+            <p>나만의 스마트 투자 플랫폼</p>
+        </div>
+        
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('portfolio')">
+                <i class="fas fa-chart-line"></i> 포트폴리오
+            </button>
+            <button class="tab-btn" onclick="switchTab('alerts')">
+                <i class="fas fa-bell"></i> 알림
+            </button>
+            <button class="tab-btn" onclick="switchTab('news')">
+                <i class="fas fa-newspaper"></i> 투자뉴스
+            </button>
+        </div>
+        
+        <!-- 포트폴리오 탭 -->
+        <div id="portfolio-tab" class="tab-content active">
+            <div class="section">
+                <div class="section-header">
+                    <h2 class="section-title">📈 관심 주식</h2>
+                    <button class="add-btn" onclick="openStockModal()">
+                        <i class="fas fa-plus"></i> 추가
+                    </button>
+                </div>
+                <div id="stock-list">
+                    <div class="empty-state">
+                        <i class="fas fa-chart-line"></i>
+                        <p>관심 주식을 추가해보세요</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-header">
+                    <h2 class="section-title">💱 관심 환율</h2>
+                    <button class="add-btn" onclick="openCurrencyModal()">
+                        <i class="fas fa-plus"></i> 추가
+                    </button>
+                </div>
+                <div id="currency-list">
+                    <div class="empty-state">
+                        <i class="fas fa-exchange-alt"></i>
+                        <p>관심 환율을 추가해보세요</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 알림 탭 -->
+        <div id="alerts-tab" class="tab-content">
+            <div class="section">
+                <div class="section-header">
+                    <h2 class="section-title">🔔 설정된 알림</h2>
+                </div>
+                <div id="alert-list">
+                    <div class="empty-state">
+                        <i class="fas fa-bell"></i>
+                        <p>설정된 알림이 없습니다</p>
+                        <p style="font-size: 0.8rem; margin-top: 8px;">포트폴리오에서 알림을 설정해보세요</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 투자뉴스 탭 -->
+        <div id="news-tab" class="tab-content">
+            <div class="section">
+                <div class="section-header">
+                    <h2 class="section-title">📰 투자 뉴스</h2>
+                    <button class="add-btn" onclick="refreshNews()">
+                        <i class="fas fa-sync-alt"></i> 새로고침
+                    </button>
+                </div>
+                <div id="news-list">
+                    <!-- 뉴스 목록이 여기에 로드됩니다 -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 주식 검색 모달 -->
+    <div id="stock-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">주식 검색</h3>
+                <button class="close-btn" onclick="closeStockModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">종목명 또는 심볼</label>
+                <input type="text" class="form-input" id="stock-search" placeholder="예: 삼성전자, AAPL, 코어위브" onkeypress="handleEnterKey(event)">
+                <div id="stock-results" class="search-results" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 환율 검색 모달 -->
+    <div id="currency-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">환율 검색</h3>
+                <button class="close-btn" onclick="closeCurrencyModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">환율 선택</label>
+                <select class="form-select" id="currency-select">
+                    <option value="">환율을 선택하세요</option>
+                    <option value="USD/KRW">USD/KRW (달러/원)</option>
+                    <option value="EUR/KRW">EUR/KRW (유로/원)</option>
+                    <option value="JPY/KRW">JPY/KRW (엔/원)</option>
+                    <option value="GBP/KRW">GBP/KRW (파운드/원)</option>
+                    <option value="CNY/KRW">CNY/KRW (위안/원)</option>
+                </select>
+            </div>
+            <button class="btn-primary" onclick="addSelectedCurrency()">환율 추가</button>
+        </div>
+    </div>
+    
+    <!-- 알림 설정 모달 -->
+    <div id="alert-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">알림 설정</h3>
+                <button class="close-btn" onclick="closeAlertModal()">&times;</button>
+            </div>
+            <div id="alert-form">
+                <!-- 알림 설정 폼이 여기에 동적으로 생성됩니다 -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- 토스트 알림 -->
+    <div id="toast" class="toast"></div>
+    
+    <script>
+        // 전역 변수
+        let watchlistStocks = JSON.parse(localStorage.getItem('watchlistStocks') || '[]');
+        let watchlistCurrencies = JSON.parse(localStorage.getItem('watchlistCurrencies') || '[]');
+        let alerts = JSON.parse(localStorage.getItem('alerts') || '[]');
+        let currentAlertItem = null;
+        
+        // API 설정
+        const API_BASE_URL = 'http://localhost:8000';
+        const API_ENDPOINTS = {
+            stock_search: `${API_BASE_URL}/naver/stocks/search`,
+            currency_search: `${API_BASE_URL}/naver/currencies/search`,
+            stock_alert: `${API_BASE_URL}/alerts/test/stock`,  // 🔧 새로운 테스트 엔드포인트
+            currency_alert: `${API_BASE_URL}/alerts/test/currency`,  // 🔧 새로운 테스트 엔드포인트
+            stock_alerts_list: `${API_BASE_URL}/alerts/test/stock`  // 🔧 새로운 테스트 엔드포인트
+        };
+        
+        // 탭 전환
+        function switchTab(tabName) {
+            // 모든 탭 버튼 비활성화
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // 선택된 탭 활성화
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // 탭별 데이터 로드
+            if (tabName === 'portfolio') {
+                loadWatchlist();
+            } else if (tabName === 'alerts') {
+                loadAlerts();
+            } else if (tabName === 'news') {
+                loadNews();
+            }
+        }
+        
+        // 관심종목 로드
+        function loadWatchlist() {
+            loadStockWatchlist();
+            loadCurrencyWatchlist();
+            loadInitialPrices();
+        }
+        
+        // UI 업데이트 함수
+        function updateStockUI(stock) {
+            const stockRow = document.querySelector(`[data-symbol="${stock.symbol}"]`);
+            if (stockRow) {
+                const priceCell = stockRow.querySelector('.current-price');
+                const changeCell = stockRow.querySelector('.change-percent');
+                
+                if (priceCell) priceCell.textContent = formatPrice(stock.current_price);
+                if (changeCell) {
+                    changeCell.textContent = `${stock.change_percent}%`;
+                    changeCell.classList.remove('positive', 'negative');
+                    changeCell.classList.add(stock.change_percent >= 0 ? 'positive' : 'negative');
+                }
+            }
+        }
+        
+        // 관심종목 가격 표시 (초기 로드 시에만)
+        async function loadInitialPrices() {
+            try {
+                // 주식 가격 로드
+                if (watchlistStocks && watchlistStocks.length > 0) {
+                    watchlistStocks = watchlistStocks.filter(stock => stock);
+                    
+                    for (let stock of watchlistStocks) {
+                        try {
+                            const response = await fetch(`${API_BASE_URL}/naver/stocks/search/${encodeURIComponent(stock.symbol)}`);
+                            if (response.ok) {
+                                const data = await response.json();
+                                if (data && data.results && data.results.length > 0) {
+                                    const stockData = data.results[0];
+                                    stock.current_price = stockData.current_price;
+                                    stock.change_percent = stockData.change_percent;
+                                    updateStockUI(stock);
+                                }
+                            }
+                        } catch (error) {
+                            console.error(`주식 ${stock.symbol} 가격 로드 실패:`, error);
+                        }
+                    }
+                }
+
+                // 환율 가격 로드
+                if (watchlistCurrencies && watchlistCurrencies.length > 0) {
+                    watchlistCurrencies = watchlistCurrencies.filter(currency => currency);
+                    
+                    for (let currency of watchlistCurrencies) {
+                        try {
+                            const response = await fetch(`${API_BASE_URL}/naver/currency/rate/${currency.from}/${currency.to}`);
+                            if (response.ok) {
+                                const data = await response.json();
+                                currency.current_rate = data.rate;
+                                updateCurrencyUI(currency);
+                            }
+                        } catch (error) {
+                            console.error(`환율 ${currency.from}/${currency.to} 로드 실패:`, error);
+                        }
+                    }
+                }
+
+                // 로컬스토리지 업데이트
+                localStorage.setItem('watchlistStocks', JSON.stringify(watchlistStocks));
+                localStorage.setItem('watchlistCurrencies', JSON.stringify(watchlistCurrencies));
+
+                // UI 업데이트
+                loadStockWatchlist();
+                loadCurrencyWatchlist();
+
+            } catch (error) {
+                console.error('가격 로드 중 예상치 못한 오류:', error);
+            }
+        }
+        
+        function loadStockWatchlist() {
+            const container = document.getElementById('stock-list');
+            
+            if (watchlistStocks.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-chart-line"></i>
+                        <p>관심 주식을 추가해보세요</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = watchlistStocks.map(stock => {
+                const stockAlerts = alerts.filter(a => a.symbol === stock.symbol && a.type === 'stock');
+                const alertText = stockAlerts.length > 0 
+                    ? `${stockAlerts.length}개 알림: ${stockAlerts.map(a => `${a.condition === 'above' ? '+' : '-'}${a.value}%`).join(', ')}`
+                    : '알림 없음';
+                
+                return `
+                    <div class="stock-card">
+                        <div class="stock-header">
+                            <div class="stock-info">
+                                <h3>${stock.name_kr || stock.name}</h3>
+                                <p>${stock.symbol} • ${stock.market || 'KOSPI'}</p>
+                            </div>
+                            <div class="stock-price">
+                                <div class="price">${formatPrice(stock.current_price)}</div>
+                                <div class="change ${stock.change_percent >= 0 ? 'positive' : 'negative'}">
+                                    ${stock.change_percent >= 0 ? '+' : ''}${stock.change_percent.toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stock-actions">
+                            <div class="alert-status ${stockAlerts.length > 0 ? 'alert-active' : ''}">${alertText}</div>
+                            <div class="action-btns">
+                                <button class="btn-small btn-alert" onclick="openAlertModal('${stock.symbol}', 'stock')">
+                                    <i class="fas fa-bell"></i> ${stockAlerts.length > 0 ? '알림 추가' : '알림 설정'}
+                                </button>
+                                <button class="btn-small" onclick="removeFromWatchlist('${stock.symbol}', 'stock')">
+                                    <i class="fas fa-trash"></i> 삭제
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function loadCurrencyWatchlist() {
+            const container = document.getElementById('currency-list');
+            
+            if (watchlistCurrencies.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-exchange-alt"></i>
+                        <p>관심 환율을 추가해보세요</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = watchlistCurrencies.map(currency => {
+                const currencyAlerts = alerts.filter(a => a.symbol === currency.symbol && a.type === 'currency');
+                const alertText = currencyAlerts.length > 0 
+                    ? `${currencyAlerts.length}개 알림: ${currencyAlerts.map(a => `${a.condition === 'above' ? '↑' : '↓'}${a.value}원`).join(', ')}`
+                    : '알림 없음';
+                
+                return `
+                    <div class="stock-card">
+                        <div class="stock-header">
+                            <div class="stock-info">
+                                <h3>${currency.name}</h3>
+                                <p>${currency.symbol}</p>
+                            </div>
+                            <div class="stock-price">
+                                <div class="price">${formatPrice(currency.current_rate)}원</div>
+                                <div class="change ${currency.change_percent >= 0 ? 'positive' : 'negative'}">
+                                    ${currency.change_percent >= 0 ? '+' : ''}${currency.change_percent.toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stock-actions">
+                            <div class="alert-status ${currencyAlerts.length > 0 ? 'alert-active' : ''}">${alertText}</div>
+                            <div class="action-btns">
+                                <button class="btn-small btn-alert" onclick="openAlertModal('${currency.symbol}', 'currency')">
+                                    <i class="fas fa-bell"></i> ${currencyAlerts.length > 0 ? '알림 추가' : '알림 설정'}
+                                </button>
+                                <button class="btn-small" onclick="removeFromWatchlist('${currency.symbol}', 'currency')">
+                                    <i class="fas fa-trash"></i> 삭제
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // 알림 목록 로드
+        function loadAlerts() {
+            const container = document.getElementById('alert-list');
+            
+            if (alerts.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-bell"></i>
+                        <p>설정된 알림이 없습니다</p>
+                        <p style="font-size: 0.8rem; margin-top: 8px;">포트폴리오에서 알림을 설정해보세요</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = alerts.map(alert => {
+                const item = alert.type === 'stock' 
+                    ? watchlistStocks.find(s => s.symbol === alert.symbol)
+                    : watchlistCurrencies.find(c => c.symbol === alert.symbol);
+                
+                const name = item ? (item.name_kr || item.name) : alert.symbol;
+                const currentPrice = item ? item.current_price : 0;
+                
+                let conditionText = '';
+                if (alert.type === 'stock') {
+                    const percentageText = alert.percentage_change ? `${alert.percentage_change}%` : '';
+                    const calculatedPriceText = alert.calculated_price ? `(${formatPrice(alert.calculated_price)}원)` : '';
+                    conditionText = `📈 ${alert.condition === 'above' ? '상승' : '하락'} ${percentageText} ${calculatedPriceText} 도달 시 알림`;
+                } else {
+                    conditionText = `💱 환율 ${formatPrice(alert.value)}원 ${alert.condition === 'above' ? '이상' : '이하'}일 때 알림`;
+                }
+                
+                return `
+                    <div class="alert-card">
+                        <h4>${name}</h4>
+                        <div class="alert-condition">${conditionText}</div>
+                        <div class="alert-time">
+                            현재가: ${formatPrice(currentPrice)}원<br>
+                            설정일: ${new Date(alert.created).toLocaleDateString()}
+                        </div>
+                        <div style="margin-top: 12px;">
+                            <button class="btn-small" onclick="deleteAlert('${alert.server_id}')">
+                                <i class="fas fa-trash"></i> 삭제
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // 뉴스 로드
+        function loadNews() {
+            const container = document.getElementById('news-list');
+            
+            // 시뮬레이션 뉴스 데이터
+            const newsData = [
+                {
+                    title: "삼성전자, 3분기 실적 시장 기대치 상회",
+                    summary: "삼성전자가 3분기 영업이익이 시장 기대치를 상회했다고 발표했습니다. 메모리 반도체 가격 상승이 주요 요인으로...",
+                    source: "한국경제",
+                    time: "2시간 전",
+                    icon: "fas fa-microchip"
+                },
+                {
+                    title: "미국 연준, 기준금리 동결 결정",
+                    summary: "미국 연방준비제도가 기준금리를 현 수준에서 동결하기로 결정했습니다. 인플레이션 둔화 속도를 지켜보겠다고...",
+                    source: "연합뉴스",
+                    time: "4시간 전",
+                    icon: "fas fa-university"
+                },
+                {
+                    title: "테슬라, 새로운 자율주행 기술 공개",
+                    summary: "테슬라가 완전 자율주행을 위한 새로운 AI 기술을 공개했습니다. 이번 기술로 자율주행 완성도가 크게...",
+                    source: "테크크런치",
+                    time: "6시간 전",
+                    icon: "fas fa-car"
+                },
+                {
+                    title: "비트코인, 4만 달러 돌파",
+                    summary: "비트코인이 다시 4만 달러를 돌파하며 상승세를 이어가고 있습니다. 기관 투자자들의 관심이 높아지면서...",
+                    source: "코인데스크",
+                    time: "8시간 전",
+                    icon: "fab fa-bitcoin"
+                },
+                {
+                    title: "애플, 새로운 iPhone 15 시리즈 출시",
+                    summary: "애플이 iPhone 15 시리즈를 공식 출시했습니다. USB-C 포트 채택과 함께 카메라 성능이 대폭 향상되었다고...",
+                    source: "매크루머스",
+                    time: "12시간 전",
+                    icon: "fab fa-apple"
+                }
+            ];
+            
+            container.innerHTML = newsData.map(news => `
+                <div class="news-card" onclick="openNews('${news.title}')">
+                    <div class="news-header">
+                        <div class="news-image">
+                            <i class="${news.icon}"></i>
+                        </div>
+                        <div class="news-content">
+                            <div class="news-title">${news.title}</div>
+                            <div class="news-summary">${news.summary}</div>
+                            <div class="news-meta">
+                                <span>${news.source}</span>
+                                <span>${news.time}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // 뉴스 새로고침
+        function refreshNews() {
+            showToast('뉴스를 새로고침했습니다');
+            loadNews();
+        }
+        
+        // 뉴스 열기
+        function openNews(title) {
+            showToast(`뉴스 열기: ${title}`);
+        }
+        
+        // 주식 검색 모달
+        function openStockModal() {
+            document.getElementById('stock-modal').style.display = 'block';
+            document.getElementById('stock-search').focus();
+        }
+        
+        function closeStockModal() {
+            document.getElementById('stock-modal').style.display = 'none';
+            document.getElementById('stock-search').value = '';
+            document.getElementById('stock-results').style.display = 'none';
+        }
+        
+        // 환율 검색 모달
+        function openCurrencyModal() {
+            document.getElementById('currency-modal').style.display = 'block';
+        }
+        
+        function closeCurrencyModal() {
+            document.getElementById('currency-modal').style.display = 'none';
+            document.getElementById('currency-select').value = '';
+        }
+        
+        // 알림 설정 모달
+        function openAlertModal(symbol, type) {
+            // 매개변수 유효성 검사
+            if (!symbol || !type) {
+                console.error('❌ openAlertModal: Invalid parameters', { symbol, type });
+                showToast('❌ 알림 설정 정보가 올바르지 않습니다.');
+                return;
+            }
+            
+            currentAlertItem = { symbol, type };
+            
+            const item = type === 'stock' 
+                ? watchlistStocks.find(s => s.symbol === symbol)
+                : watchlistCurrencies.find(c => c.symbol === symbol);
+            
+            // item이 없을 때 처리
+            if (!item) {
+                console.error('❌ openAlertModal: Item not found', { symbol, type });
+                showToast('❌ 해당 종목/환율 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            // 주식과 환율에 따라 다른 폼 표시
+            const formHtml = type === 'stock' 
+                ? `
+                    <div class="form-group">
+                        <label class="form-label">📈 ${item.name_kr || item.name} 주식 알림</label>
+                        <p style="color: #666; font-size: 12px; margin: 5px 0;">주식 가격 변동률 기준으로 알림을 설정합니다</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">알림 조건</label>
+                        <select class="form-select" id="alert-condition">
+                            <option value="above">📈 상승 (지정한 % 이상 오를 때)</option>
+                            <option value="below">📉 하락 (지정한 % 이상 떨어질 때)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">변동률 (%)</label>
+                        <input type="number" class="form-input" id="alert-value" placeholder="예: 5 (5% 변동 시 알림)" step="0.1" min="0.1">
+                        <small style="color: #666;">현재가 대비 변동률을 입력하세요</small>
+                    </div>
+                    <button class="btn-primary" onclick="saveAlert()">📱 주식 알림 설정</button>
+                `
+                : `
+                    <div class="form-group">
+                        <label class="form-label">💱 ${item.name} 환율 알림</label>
+                        <p style="color: #666; font-size: 12px; margin: 5px 0;">특정 환율 가격에 도달하면 알림을 받습니다</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">알림 조건</label>
+                        <select class="form-select" id="alert-condition">
+                            <option value="above">⬆️ 환율이 지정 가격 이상일 때</option>
+                            <option value="below">⬇️ 환율이 지정 가격 이하일 때</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">🎯 목표 환율 (원)</label>
+                        <input type="number" class="form-input" id="alert-value" placeholder="예: 1300 (1달러 = 1300원 시 알림)" step="1" min="1">
+                        <small style="color: #666;">원하는 환율 가격을 입력하세요 (예: USD/KRW 1300원)</small>
+                    </div>
+                    <button class="btn-primary" onclick="saveAlert()">📱 환율 알림 설정</button>
+                `;
+            
+            document.getElementById('alert-form').innerHTML = formHtml;
+            document.getElementById('alert-modal').style.display = 'block';
+        }
+        
+        function closeAlertModal() {
+            document.getElementById('alert-modal').style.display = 'none';
+            currentAlertItem = null;
+        }
+        
+        // 알림 저장 (백엔드 API + localStorage)
+        async function saveAlert() {
+            if (!currentAlertItem) {
+                console.error('❌ currentAlertItem is null');
+                showToast('❌ 알림 설정 정보가 없습니다. 다시 시도해주세요.');
+                return;
+            }
+            
+            const condition = document.getElementById('alert-condition').value;
+            const value = parseFloat(document.getElementById('alert-value').value);
+            
+            if (!value || value <= 0) {
+                showToast('올바른 값을 입력해주세요');
+                return;
+            }
+            
+            // 현재 가격 가져오기
+            const item = currentAlertItem.type === 'stock' 
+                ? watchlistStocks.find(s => s.symbol === currentAlertItem.symbol)
+                : watchlistCurrencies.find(c => c.symbol === currentAlertItem.symbol);
+            
+            if (!item) {
+                showToast('❌ 종목 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            if (!item.current_price) {
+                showToast('❌ 현재 가격 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            // 계산된 목표가 설정
+            const currentPrice = parseFloat(item.current_price);
+            let calculatedPrice;
+            
+            if (currentAlertItem.type === 'stock') {
+                // 주식: 현재가 기준 퍼센트 계산
+                calculatedPrice = condition === 'above'
+                    ? currentPrice * (1 + value / 100)  // 상승 목표가
+                    : currentPrice * (1 - value / 100); // 하락 목표가
+            } else {
+                // 환율: 직접 입력한 목표가 사용
+                calculatedPrice = value;
+            }
+            
+            // 완전히 동일한 알림만 중복 방지 (같은 종목, 같은 조건, 같은 값)
+            const existingAlert = alerts.find(a => 
+                a.symbol === currentAlertItem.symbol && 
+                a.type === currentAlertItem.type && 
+                a.condition === condition && 
+                a.value === value
+            );
+            
+            if (existingAlert) {
+                showToast('동일한 조건의 알림이 이미 존재합니다');
+                return;
+            }
+            
+            // 새 알림 생성
+            const newAlert = {
+                id: Date.now().toString(),
+                symbol: currentAlertItem.symbol,
+                type: currentAlertItem.type,
+                condition: condition,
+                value: value,
+                percentage_change: currentAlertItem.type === 'stock' ? value : null,  // 주식의 경우 퍼센트 변화율 저장
+                calculated_price: calculatedPrice,  // 계산된 목표가 저장
+                created: new Date().toISOString()
+            };
+
+            try {
+                // API 서버의 테스트 엔드포인트 사용
+                const apiEndpoint = currentAlertItem.type === 'stock' 
+                    ? API_ENDPOINTS.stock_alert
+                    : API_ENDPOINTS.currency_alert;
+
+                // API 요청 데이터 구조를 타입별로 분리
+                const requestData = currentAlertItem.type === 'stock' ? {
+                    stock_symbol: currentAlertItem.symbol,
+                    target_price: calculatedPrice,  // 계산된 목표가 전송
+                    condition: condition,
+                    percentage_change: value  // 퍼센트 변화율도 함께 전송
+                } : {
+                    base_currency: currentAlertItem.symbol.split('/')[0],
+                    target_currency: currentAlertItem.symbol.split('/')[1],
+                    target_rate: value,
+                    condition: condition
+                };
+
+                const response = await fetch(apiEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'API 호출 실패');
+                }
+
+                const result = await response.json();
+                console.log('✅ 데이터베이스 저장 성공:', result);
+
+                // 데이터베이스 저장 성공 시 로컬 스토리지에도 저장
+                newAlert.server_id = result.id;
+                alerts.push(newAlert);
+                localStorage.setItem('alerts', JSON.stringify(alerts));
+                
+                const alertMessage = currentAlertItem.type === 'stock' 
+                    ? `🎉 주식 알림이 설정되었습니다: ${value}% ${condition === 'above' ? '상승' : '하락'} 시 (${formatPrice(calculatedPrice)}원)`
+                    : `🎉 환율 알림이 설정되었습니다: ${formatPrice(value)}원 ${condition === 'above' ? '이상' : '이하'}`;
+                
+                showToast(alertMessage);
+                closeAlertModal();
+                loadAlerts();
+                loadWatchlist();
+            } catch (error) {
+                console.error('❌ 데이터베이스 저장 실패:', error);
+                showToast(`❌ 저장 실패: ${error.message}`);
+            }
+        }
+        
+        // 알림 삭제
+        async function deleteAlert(alertId) {
+            try {
+                // 서버에서 알림 삭제
+                const response = await fetch(`${API_ENDPOINTS.stock_alert}/${alertId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    // 로컬 alerts 배열에서도 제거
+                    alerts = alerts.filter(alert => alert.server_id !== alertId);
+                    localStorage.setItem('alerts', JSON.stringify(alerts));
+                    
+                    // UI 업데이트
+                    loadAlerts();
+                    loadWatchlist();
+                    
+                    showToast('✅ 알림이 삭제되었습니다.');
+                } else {
+                    showToast('❌ 알림 삭제 실패');
+                }
+            } catch (error) {
+                console.error('알림 삭제 중 오류:', error);
+                showToast('❌ 알림 삭제 중 오류 발생');
+            }
+        }
+        
+        // 엔터키 처리
+        function handleEnterKey(event) {
+            if (event.key === 'Enter' || event.keyCode === 13) {
+                event.preventDefault();
+                const query = document.getElementById('stock-search').value.trim();
+                if (query.length > 0) {
+                    showToast(`🔍 "${query}" 검색 중...`);
+                    searchStocks();
+                }
+            }
+        }
+
+        // 주식 검색 (실제 API 호출)
+        async function searchStocks() {
+            const query = document.getElementById('stock-search').value.trim();
+            const resultsContainer = document.getElementById('stock-results');
+            
+            if (query.length < 1) {
+                resultsContainer.style.display = 'none';
+                return;
+            }
+            
+            // 로딩 표시
+            resultsContainer.innerHTML = '<div class="search-item">🔍 검색 중...</div>';
+            resultsContainer.style.display = 'block';
+            
+            try {
+                // 네이버 주식 검색 API 호출
+                const response = await fetch(`http://localhost:8000/naver/stocks/search/${encodeURIComponent(query)}`);
+                
+                if (!response.ok) {
+                    throw new Error('API 호출 실패');
+                }
+                
+                const data = await response.json();
+                
+                if (data.results && data.results.length > 0) {
+                    resultsContainer.innerHTML = data.results.map(stock => `
+                        <div class="search-item" onclick="addToWatchlist('${stock.symbol}', 'stock', ${JSON.stringify(stock).replace(/"/g, '&quot;')})">
+                            <div class="search-info">
+                                <h4>${stock.name_kr || stock.name}</h4>
+                                <p>${stock.symbol} • ${stock.market || 'KOSPI'}</p>
+                            </div>
+                            <div class="search-price">
+                                <div>${formatPrice(stock.current_price || 0)}</div>
+                                <div class="change ${(stock.change_percent || 0) >= 0 ? 'positive' : 'negative'}">
+                                    ${(stock.change_percent || 0) >= 0 ? '+' : ''}${(stock.change_percent || 0).toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    resultsContainer.innerHTML = '<div class="search-item">❌ 검색 결과가 없습니다</div>';
+                }
+            } catch (error) {
+                console.error('주식 검색 오류:', error);
+                
+                // 하드코딩 완전 제거 - API 실패 시 명확한 안내만
+                resultsContainer.innerHTML = `
+                    <div style="padding: 15px; background: #f8d7da; color: #721c24; border-radius: 8px; font-size: 14px; text-align: center;">
+                        ❌ API 서버가 실행되지 않았습니다<br>
+                        <small style="margin-top: 8px; display: block;">터미널: cd backend && python run_server.py</small>
+                    </div>
+                `;
+            }
+        }
+        
+        // 선택된 환율 추가 - 실제 네이버 파싱만 사용
+        async function addSelectedCurrency() {
+            const select = document.getElementById('currency-select');
+            const selectedValue = select.value;
+            
+            if (!selectedValue) {
+                showToast('환율을 선택해주세요');
+                return;
+            }
+            
+            // 실제 네이버 환율 파싱으로 데이터 가져오기
+            try {
+                showToast('실시간 환율 데이터 조회 중...');
+                const response = await fetch(`http://localhost:8000/naver/currency/rate/${selectedValue}/KRW`);
+                
+                if (!response.ok) {
+                    throw new Error('환율 API 호출 실패');
+                }
+                
+                const data = await response.json();
+                
+                if (data.rate) {
+                    const currencyData = {
+                        symbol: selectedValue,
+                        name: select.options[select.selectedIndex].text,
+                        current_rate: data.rate,
+                        change_percent: 0, // 실제 변동률은 다음 업데이트 시 계산
+                        source: 'naver_real_parsing'
+                    };
+                    
+                    addToWatchlist(selectedValue, 'currency', currencyData);
+                } else {
+                    throw new Error('환율 데이터 없음');
+                }
+            } catch (error) {
+                console.error('환율 조회 오류:', error);
+                showToast('❌ 실시간 환율 데이터 조회 실패 - 정확한 데이터를 제공할 수 없어 추가를 중단합니다');
+                return;
+            }
+        }
+        
+        // 관심종목 추가
+        async function addToWatchlist(symbol, type, data) {
+            const parsedData = typeof data === 'string' ? JSON.parse(data.replace(/&quot;/g, '"')) : data;
+            
+            try {
+                // 백엔드 API 호출
+                const response = await fetch('http://localhost:8000/watchlist', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        type: type,
+                        name: parsedData.name,
+                        name_kr: parsedData.name_kr,
+                        market: parsedData.market
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || '관심종목 추가 실패');
+                }
+                
+                // 백엔드 응답이 성공적이면 localStorage 업데이트
+                if (type === 'stock') {
+                    watchlistStocks.push(parsedData);
+                    localStorage.setItem('watchlistStocks', JSON.stringify(watchlistStocks));
+                    closeStockModal();
+                } else {
+                    watchlistCurrencies.push(parsedData);
+                    localStorage.setItem('watchlistCurrencies', JSON.stringify(watchlistCurrencies));
+                    closeCurrencyModal();
+                }
+                
+                showToast('관심종목에 추가되었습니다');
+                loadWatchlist();
+            } catch (error) {
+                console.error('Failed to add to watchlist:', error);
+                showToast(`❌ ${error.message}`);
+            }
+        }
+        
+        // 관심종목 제거
+        async function removeFromWatchlist(symbol, type) {
+            try {
+                // 백엔드 API 호출
+                const response = await fetch(`http://localhost:8000/watchlist/${symbol}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || '관심종목 제거 실패');
+                }
+                
+                // 백엔드 응답이 성공적이면 localStorage 업데이트
+                if (type === 'stock') {
+                    watchlistStocks = watchlistStocks.filter(s => s.symbol !== symbol);
+                    localStorage.setItem('watchlistStocks', JSON.stringify(watchlistStocks));
+                } else {
+                    watchlistCurrencies = watchlistCurrencies.filter(c => c.symbol !== symbol);
+                    localStorage.setItem('watchlistCurrencies', JSON.stringify(watchlistCurrencies));
+                }
+                
+                // 관련 알림도 제거
+                alerts = alerts.filter(a => !(a.symbol === symbol && a.type === type));
+                localStorage.setItem('alerts', JSON.stringify(alerts));
+                
+                showToast('관심종목에서 제거되었습니다');
+                loadWatchlist();
+            } catch (error) {
+                console.error('Failed to remove from watchlist:', error);
+                showToast(`❌ ${error.message}`);
+            }
+        }
+        
+        // 가격 포맷팅
+        function formatPrice(price) {
+            // null, undefined 체크
+            if (price == null) return '0';
+            
+            // 문자열을 숫자로 변환
+            const numPrice = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.-]/g, '')) : price;
+            
+            // NaN 체크
+            if (isNaN(numPrice)) return '0';
+            
+            if (numPrice >= 1000) {
+                return numPrice.toLocaleString();
+            }
+            return numPrice.toFixed(2);
+        }
+        
+        // 토스트 알림 표시
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // 모달 외부 클릭 시 닫기
+        window.onclick = function(event) {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+
+        // 페이지 로드 시 백엔드에서 관심종목 목록 가져오기
+        async function loadWatchlistFromBackend() {
+            try {
+                const response = await fetch('http://localhost:8000/watchlist', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch watchlist from backend');
+                }
+                
+                const data = await response.json();
+                
+                // localStorage 업데이트
+                watchlistStocks = data.filter(item => item.type === 'stock').map(item => ({
+                    symbol: item.symbol,
+                    name: item.name,
+                    name_kr: item.name_kr,
+                    market: item.market,
+                    current_price: 0,
+                    change_percent: 0
+                }));
+                
+                watchlistCurrencies = data.filter(item => item.type === 'currency').map(item => ({
+                    symbol: item.symbol,
+                    name: item.name,
+                    current_rate: 0,
+                    change_percent: 0
+                }));
+                
+                localStorage.setItem('watchlistStocks', JSON.stringify(watchlistStocks));
+                localStorage.setItem('watchlistCurrencies', JSON.stringify(watchlistCurrencies));
+                
+                // UI 업데이트
+                loadWatchlist();
+            } catch (error) {
+                console.error('Failed to load watchlist:', error);
+                showToast('❌ 관심종목 목록을 불러오는데 실패했습니다');
+            }
+        }
+
+        // 페이지 로드 시 백엔드에서 관심종목 목록 가져오기
+        document.addEventListener('DOMContentLoaded', function() {
+            if (localStorage.getItem('access_token')) {
+                loadWatchlistFromBackend();
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,22 @@
+{
+    "venvPath": ".",
+    "venv": "venv",
+    "extraPaths": [
+        "src",
+        "venv/lib/python3.9/site-packages"
+    ],
+    "pythonVersion": "3.9",
+    "typeCheckingMode": "basic",
+    "useLibraryCodeForTypes": true,
+    "autoImportCompletions": true,
+    "include": [
+        "src/**/*.py",
+        "tests/**/*.py",
+        "*.py"
+    ],
+    "exclude": [
+        "**/__pycache__",
+        "**/*.pyc",
+        "venv/**/*"
+    ]
+} 

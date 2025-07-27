@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stock-alert-app"
+version = "0.1.0"
+description = "Stock and Currency Alert Application"
+requires-python = ">=3.9"
+dependencies = [
+    "yfinance",
+    "forex-python",
+    "apns2",
+    "fastapi",
+    "pydantic",
+]
+
+[tool.setuptools]
+packages = ["src"]
+package-dir = {"" = "."} 
