@@ -12,7 +12,6 @@ asyncpg==0.29.0
 # 웹 스크래핑 및 파싱
 beautifulsoup4==4.13.4
 requests==2.32.3
-lxml==5.4.1
 html5lib==1.1
 
 # HTTP 클라이언트
