@@ -9,6 +9,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Dict, Any, Optional
+from contextlib import asynccontextmanager
 
 # 라우터 import - 알림 시스템 포함
 from src.api.routes import (
@@ -18,6 +20,7 @@ from src.api.routes import (
     watchlist_routes  # ✅ 관심종목 라우터 추가
 )
 from src.config.logging_config import configure_logging
+from src.config.settings import settings
 from src.services.alert_scheduler import unified_alert_scheduler  # ✅ 스케줄러 추가
 from src.models.database import get_db, initialize_database
 from src.services.auth_service import AuthService
@@ -43,11 +46,34 @@ config = load_config()
 configure_logging()
 logger = logging.getLogger(__name__)
 
+# 📊 애플리케이션 시작 이벤트
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """애플리케이션 생명주기 관리"""
+    logger.info("🚀 주식 알림 API 서버 시작 중...")
+    
+    # 데이터베이스 테이블 생성
+    try:
+        from src.models.database import engine, Base
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("✅ 데이터베이스 테이블 생성/확인 완료")
+    except Exception as e:
+        logger.error(f"❌ 데이터베이스 테이블 생성 실패: {e}")
+        raise
+    
+    logger.info("🎯 주식 알림 API 서버 시작 완료!")
+    yield
+    logger.info("🛑 주식 알림 API 서버 종료")
+
 # FastAPI 애플리케이션 생성
 app = FastAPI(
-    title="Stock Alert API - 완전판",
-    description="주식/환율 알림 시스템 (웹 시뮬레이터 연동)",
-    version="3.0.0"
+    title="주식 알림 API",
+    description="실시간 주식/환율 알림 및 뉴스 파싱 시스템",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None
 )
 
 # CORS 미들웨어 설정

@@ -16,59 +16,31 @@ from src.config.settings import settings
 # 로거 설정
 logger = logging.getLogger(__name__)
 
-# 데이터베이스 URL 가져오기 (클라우드/로컬 자동 감지)
-DATABASE_URL = settings.DATABASE_URL or 'sqlite+aiosqlite:///./stock_alert.db'
+# 데이터베이스 URL 가져오기
+DATABASE_URL = settings.DATABASE_URL
 
-# PostgreSQL 연결 우선 (Supabase)
-is_cloud = os.getenv('RENDER') or os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('HEROKU_APP_ID')
-if is_cloud and not DATABASE_URL.startswith('sqlite'):
-    # 클라우드 환경에서 PostgreSQL 사용 (asyncpg 드라이버)
-    if DATABASE_URL.startswith('postgres://'):
-        DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql+asyncpg://', 1)
-    elif DATABASE_URL.startswith('postgresql://'):
-        DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+asyncpg://', 1)
-    db_type = 'PostgreSQL (Supabase + asyncpg)'
-elif 'sqlite' in DATABASE_URL:
-    # SQLite 설정 (로컬 개발용)
-    if not DATABASE_URL.startswith('sqlite+aiosqlite'):
-        DATABASE_URL = DATABASE_URL.replace('sqlite:///', 'sqlite+aiosqlite:///')
-    db_type = 'SQLite (aiosqlite)'
-else:
-    db_type = '기타'
+# PostgreSQL 연결 URL 변환 (asyncpg 드라이버 사용)
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql+asyncpg://', 1)
+elif DATABASE_URL.startswith('postgresql://'):
+    DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+asyncpg://', 1)
+elif not DATABASE_URL.startswith('postgresql+asyncpg://'):
+    raise ValueError("PostgreSQL 연결 URL이 필요합니다!")
 
-logger.info(f"🗄️ 데이터베이스 연결: {db_type}")
+logger.info(f"🗄️ PostgreSQL 연결 (asyncpg)")
 logger.info(f"🔗 연결 URL: {DATABASE_URL[:50]}...")
 
-# 비동기 엔진 생성
-try:
-    if 'postgresql+asyncpg' in DATABASE_URL:
-        # PostgreSQL (asyncpg) 설정
-        engine = create_async_engine(
-            DATABASE_URL,
-            echo=settings.DEBUG,
-            pool_size=5,
-            max_overflow=10,
-            pool_pre_ping=True,
-            pool_recycle=3600
-        )
-    elif 'sqlite+aiosqlite' in DATABASE_URL:
-        # SQLite (aiosqlite) 설정
-        engine = create_async_engine(
-            DATABASE_URL,
-            echo=settings.DEBUG,
-            pool_pre_ping=True
-        )
-    else:
-        # 기타 데이터베이스
-        engine = create_async_engine(DATABASE_URL, echo=settings.DEBUG)
-    
-    logger.info("✅ 데이터베이스 엔진 생성 완료")
-except Exception as e:
-    logger.error(f"❌ 데이터베이스 엔진 생성 실패: {e}")
-    # 폴백: SQLite 사용
-    DATABASE_URL = 'sqlite+aiosqlite:///./stock_alert.db'
-    engine = create_async_engine(DATABASE_URL, echo=settings.DEBUG)
-    logger.info("🔄 SQLite로 폴백 완료")
+# PostgreSQL 비동기 엔진 생성
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=settings.DEBUG,
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True,
+    pool_recycle=3600
+)
+
+logger.info("✅ PostgreSQL 엔진 생성 완료")
 
 # 모델 기본 클래스
 Base = declarative_base()

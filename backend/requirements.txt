@@ -4,10 +4,9 @@
 fastapi==0.115.14
 uvicorn[standard]==0.32.1
 
-# 데이터베이스 (PostgreSQL + SQLite)
+# 데이터베이스 (PostgreSQL)
 sqlalchemy==1.4.53
 asyncpg==0.28.0
-aiosqlite==0.19.0
 
 # 웹 스크래핑 및 파싱
 beautifulsoup4==4.13.4
