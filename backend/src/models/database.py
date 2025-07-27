@@ -19,18 +19,18 @@ logger = logging.getLogger(__name__)
 # 데이터베이스 URL 가져오기
 DATABASE_URL = settings.DATABASE_URL
 
-# PostgreSQL 연결 URL 변환 (psycopg2 드라이버 사용)
+# PostgreSQL 연결 URL 변환 (psycopg3 드라이버 사용)
 if DATABASE_URL.startswith('postgres://'):
-    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql+psycopg2://', 1)
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql+psycopg://', 1)
 elif DATABASE_URL.startswith('postgresql://'):
-    DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg2://', 1)
-elif not DATABASE_URL.startswith('postgresql+psycopg2://'):
+    DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg://', 1)
+elif not DATABASE_URL.startswith('postgresql+psycopg://'):
     raise ValueError("PostgreSQL 연결 URL이 필요합니다!")
 
-logger.info(f"🗄️ PostgreSQL 연결 (psycopg2)")
+logger.info(f"🗄️ PostgreSQL 연결 (psycopg3)")
 logger.info(f"🔗 연결 URL: {DATABASE_URL[:50]}...")
 
-# PostgreSQL 동기 엔진 생성 (psycopg2는 비동기 지원 제한적)
+# PostgreSQL 동기 엔진 생성
 engine = create_engine(
     DATABASE_URL,
     echo=settings.DEBUG,
