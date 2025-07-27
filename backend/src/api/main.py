@@ -6,6 +6,8 @@ from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # 라우터 import - 알림 시스템 포함
@@ -57,6 +59,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 웹 시뮬레이터 정적 파일 서빙
+web_simulator_path = os.path.join(os.path.dirname(__file__), '..', '..', 'web_simulator')
+if os.path.exists(web_simulator_path):
+    app.mount("/static", StaticFiles(directory=web_simulator_path), name="static")
+    logger.info(f"✅ 웹 시뮬레이터 정적 파일 서빙: {web_simulator_path}")
+
 # 라우터 포함 - 모든 기능 활성화
 app.include_router(web_simulator_routes.router, tags=["웹 시뮬레이터"])
 app.include_router(naver_stock_routes.router, prefix="/naver", tags=["네이버 실시간 파싱"])
@@ -70,6 +78,49 @@ news_service = NewsService()
 stock_service = StockService()
 currency_service = CurrencyService()
 alert_scheduler = AlertScheduler(stock_service, currency_service, news_service)
+
+# 웹 시뮬레이터 메인 페이지
+@app.get("/", include_in_schema=False)
+async def web_simulator():
+    """웹 시뮬레이터 메인 페이지"""
+    web_simulator_file = os.path.join(web_simulator_path, 'index.html')
+    if os.path.exists(web_simulator_file):
+        return FileResponse(web_simulator_file)
+    else:
+        return {"message": "웹 시뮬레이터를 찾을 수 없습니다."}
+
+# Health check 엔드포인트
+@app.get("/health", tags=["상태 확인"])
+async def health_check():
+    """서버 상태 확인"""
+    return {
+        "status": "healthy",
+        "message": "서버가 정상 작동 중입니다.",
+        "web_simulator": "available" if os.path.exists(web_simulator_path) else "not_found"
+    }
+
+# 기본 상태 확인 엔드포인트
+@app.get("/api", tags=["상태 확인"])
+async def root():
+    """루트 엔드포인트"""
+    return {
+        "status": "success",
+        "message": "주식 알림 시스템 완전판!",
+        "features": [
+            "✅ 네이버 주식/환율 실시간 파싱",
+            "✅ 알림 시스템 (주식, 환율, 뉴스)",
+            "✅ 웹 시뮬레이터 연동",
+            "✅ 백그라운드 스케줄러"
+        ],
+        "available_endpoints": [
+            "/ - 웹 시뮬레이터",
+            "/health - 상태 확인",
+            "/naver/stocks/search/엔비디아",
+            "/alerts/stock (POST) - 주식 알림 생성",
+            "/alerts/currency (POST) - 환율 알림 생성", 
+            "/dev/create-test-user (POST) - 테스트 사용자 생성"
+        ]
+    }
 
 # 개발환경용 간단한 테스트 사용자 생성 엔드포인트
 @app.post("/dev/create-test-user")
@@ -96,41 +147,6 @@ async def create_test_user(db: AsyncSession = Depends(get_db)):
         }
     except Exception as e:
         return {"error": f"테스트 사용자 생성 실패: {str(e)}"}
-
-# 기본 상태 확인 엔드포인트
-@app.get("/", tags=["상태 확인"])
-async def root():
-    """루트 엔드포인트"""
-    return {
-        "status": "success",
-        "message": "주식 알림 시스템 완전판!",
-        "features": [
-            "✅ 네이버 주식/환율 실시간 파싱",
-            "✅ 알림 시스템 (주식, 환율, 뉴스)",
-            "✅ 웹 시뮬레이터 연동",
-            "✅ 백그라운드 스케줄러"
-        ],
-        "available_endpoints": [
-            "/naver/stocks/search/엔비디아",
-            "/alerts/stock (POST) - 주식 알림 생성",
-            "/alerts/currency (POST) - 환율 알림 생성", 
-            "/dev/create-test-user (POST) - 테스트 사용자 생성",
-            "http://localhost:8008 (웹 시뮬레이터)"
-        ]
-    }
-
-@app.get("/health", tags=["상태 확인"])
-async def health_check():
-    """서버 상태 확인 엔드포인트"""
-    return {
-        "status": "healthy",
-        "message": "주식 알림 시스템 작동 중",
-        "services": {
-            "naver_parsing": "✅ 실시간 작동",
-            "alert_system": "✅ 활성화",
-            "scheduler": "✅ 백그라운드 실행 중" if unified_alert_scheduler.is_running else "⚠️ 대기 중"
-        }
-    }
 
 # 애플리케이션 시작 이벤트
 @app.on_event("startup")
