@@ -1,7 +1,8 @@
 from sqlalchemy import create_engine, Column, String, Boolean, DateTime, ForeignKey, Numeric, Integer, Float, TIMESTAMP, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.hybrid import hybrid_property
 from decimal import Decimal
 from datetime import datetime
@@ -52,25 +53,21 @@ else:
     # Oracle 또는 기타 데이터베이스
     engine = create_async_engine(DATABASE_URL, echo=settings.DEBUG)
 
-# 비동기 세션 팩토리 생성
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False
-)
-
 # 모델 기본 클래스
 Base = declarative_base()
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """비동기 데이터베이스 세션을 생성하고 관리하는 함수"""
-    async with AsyncSessionLocal() as session:
+    async with AsyncSession(engine) as session:
         try:
             yield session
         finally:
             await session.close()
+
+# 호환성을 위한 AsyncSessionLocal 함수
+def AsyncSessionLocal():
+    """AsyncSession 생성 함수"""
+    return AsyncSession(engine)
 
 # 데이터베이스 객체 생성
 database = {
