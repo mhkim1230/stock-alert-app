@@ -19,19 +19,19 @@ logger = logging.getLogger(__name__)
 # 데이터베이스 URL 가져오기
 DATABASE_URL = settings.DATABASE_URL
 
-# PostgreSQL 연결 URL 변환 (asyncpg 드라이버 사용)
+# PostgreSQL 연결 URL 변환 (psycopg2 드라이버 사용)
 if DATABASE_URL.startswith('postgres://'):
-    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql+asyncpg://', 1)
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql+psycopg2://', 1)
 elif DATABASE_URL.startswith('postgresql://'):
-    DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+asyncpg://', 1)
-elif not DATABASE_URL.startswith('postgresql+asyncpg://'):
+    DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg2://', 1)
+elif not DATABASE_URL.startswith('postgresql+psycopg2://'):
     raise ValueError("PostgreSQL 연결 URL이 필요합니다!")
 
-logger.info(f"🗄️ PostgreSQL 연결 (asyncpg)")
+logger.info(f"🗄️ PostgreSQL 연결 (psycopg2)")
 logger.info(f"🔗 연결 URL: {DATABASE_URL[:50]}...")
 
-# PostgreSQL 비동기 엔진 생성
-engine = create_async_engine(
+# PostgreSQL 동기 엔진 생성 (psycopg2는 비동기 지원 제한적)
+engine = create_engine(
     DATABASE_URL,
     echo=settings.DEBUG,
     pool_size=5,
@@ -45,23 +45,27 @@ logger.info("✅ PostgreSQL 엔진 생성 완료")
 # 모델 기본 클래스
 Base = declarative_base()
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """비동기 데이터베이스 세션을 생성하고 관리하는 함수"""
-    async with AsyncSession(engine) as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+# 세션 생성
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# 호환성을 위한 AsyncSessionLocal 함수
+# 동기 데이터베이스 세션 의존성
+def get_db() -> Generator[Session, None, None]:
+    """동기 데이터베이스 세션"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# 호환성을 위한 AsyncSessionLocal 함수 (실제로는 동기)
 def AsyncSessionLocal():
-    """AsyncSession 생성 함수"""
-    return AsyncSession(engine)
+    """동기 Session 생성 함수 (호환성용)"""
+    return SessionLocal()
 
 # 데이터베이스 객체 생성
 database = {
     'engine': engine,
-    'AsyncSessionLocal': AsyncSessionLocal,
+    'SessionLocal': SessionLocal,
     'get_db': get_db
 }
 

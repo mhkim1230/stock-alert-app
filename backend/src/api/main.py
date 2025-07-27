@@ -55,8 +55,7 @@ async def lifespan(app: FastAPI):
     # 데이터베이스 테이블 생성
     try:
         from src.models.database import engine, Base
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        Base.metadata.create_all(bind=engine)
         logger.info("✅ 데이터베이스 테이블 생성/확인 완료")
     except Exception as e:
         logger.error(f"❌ 데이터베이스 테이블 생성 실패: {e}")
