@@ -3,7 +3,17 @@ import Combine
 
 class NetworkService {
     static let shared = NetworkService()
-    private let baseURL = "http://localhost:8000"
+    
+    // 환경에 따른 Base URL 설정
+    private var baseURL: String {
+        #if DEBUG
+        return "http://localhost:8000"
+        #else
+        // 배포 후 실제 Render.com 주소로 변경 필요
+        // 예: "https://stock-alert-api.onrender.com"
+        return "https://YOUR_RENDER_APP_NAME.onrender.com"
+        #endif
+    }
     
     private init() {}
     
