@@ -47,6 +47,7 @@ struct StockDetailView: View {
     @State private var showingThresholdAlert = false
     @State private var thresholdValue = ""
     @State private var selectedPriceRange: PriceRange = .oneMonth
+    @State private var watchlistSaved = false
     
     enum PriceRange {
         case oneWeek, oneMonth, threeMonths, oneYear
@@ -122,6 +123,20 @@ struct StockDetailView: View {
                     .background(Color.blue.opacity(0.1))
                     .cornerRadius(10)
                 }
+
+                Button(action: {
+                    viewModel.addToWatchlist(symbol: stock.symbol)
+                    watchlistSaved = true
+                }) {
+                    HStack {
+                        Image(systemName: "star.fill")
+                        Text(watchlistSaved ? "관심종목에 저장됨" : "관심종목에 추가")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.yellow.opacity(0.15))
+                    .cornerRadius(10)
+                }
                 .alert("알림 임계값 설정", isPresented: $showingThresholdAlert) {
                     TextField("가격 임계값", text: $thresholdValue)
                         .keyboardType(.decimalPad)
@@ -180,6 +195,7 @@ struct StockDetailView: View {
             
             newsArticles = viewModel.stockNews
             historicalPrices = viewModel.stockHistoricalPrices
+            watchlistSaved = viewModel.stocks.contains(where: { $0.symbol == stock.symbol })
         }
     }
 }

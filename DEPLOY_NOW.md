@@ -1,70 +1,55 @@
-# 🚀 지금 바로 PC 끄고 24시간 돌리는 법 (클라우드 배포 가이드)
+# Deploy Now
 
-이 가이드만 따라 하면 15분 안에 PC를 꺼도 앱이 24시간 작동하게 됩니다.
+## 1. Supabase
+1. Supabase에서 새 프로젝트를 생성합니다.
+2. `Project Settings -> Database -> Connection string` 에서 PostgreSQL URI를 복사합니다.
+3. 비밀번호를 실제 값으로 치환한 뒤 저장합니다.
 
-## 1단계: GitHub에 코드 올리기
+필요 값:
+- `DATABASE_URL`
 
-1. GitHub.com에 로그인하고 우측 상단 `+` 버튼 -> **New repository** 클릭
-2. Repository name에 `stock-alert-app` 입력 -> **Create repository** 클릭
-3. 아래 명령어를 터미널에 한 줄씩 복사해서 붙여넣으세요:
+## 2. Render
+1. GitHub에 이 저장소를 푸시합니다.
+2. Render에서 `Blueprint` 또는 `New Web Service` 로 저장소를 연결합니다.
+3. 루트의 [render.yaml](/Users/mhkim/AI프로젝트/render.yaml) 기준으로 배포합니다.
+4. 아래 환경 변수를 입력합니다.
 
+필수 환경 변수:
+- `DATABASE_URL`
+- `ADMIN_API_KEY`
+- `APNS_KEY_ID`
+- `APNS_TEAM_ID`
+- `APNS_BUNDLE_ID`
+- `APNS_PRIVATE_KEY`
+
+선택 환경 변수:
+- `ALLOWED_ORIGINS`
+- `DEBUG=false`
+- `APNS_USE_SANDBOX=true`
+
+## 3. Cron
+Render cron service의 호출 URL을 실제 웹서비스 주소로 바꿉니다.
+
+예:
 ```bash
-# git 설정이 안 되어 있다면 먼저 실행
-git init
-git add .
-git commit -m "클라우드 배포 준비 완료"
-git branch -M main
-
-# [중요] 아래 주소는 방금 만든 본인의 레포지토리 주소로 바꿔야 합니다!
-git remote add origin https://github.com/YOUR_USERNAME/stock-alert-app.git
-git push -u origin main
+curl -X POST https://YOUR_RENDER_APP.onrender.com/internal/run-alert-checks \
+  -H "X-Admin-Key: $ADMIN_API_KEY"
 ```
 
-## 2단계: 무료 데이터베이스 만들기 (Supabase)
+## 4. iPhone App
+앱의 설정 화면에서 아래 두 값을 입력합니다.
+- `Server URL`
+- `Admin API Key`
 
-1. [Supabase.com](https://supabase.com) 접속 -> **Start your project**
-2. **New Project** 클릭
-   - Name: `StockAlertDB`
-   - Database Password: **강력한 비밀번호 생성 후 꼭 메모장에 적어두세요!**
-   - Region: `Korea`가 있다면 선택, 없다면 `Singapore` 또는 `Tokyo`
-3. 프로젝트가 생성될 때까지 기다립니다 (약 1-2분).
-4. 생성 후 왼쪽 메뉴 **Project Settings (톱니바퀴)** -> **Database** 클릭
-5. **Connection String** -> **URI** 탭 클릭
-6. 주소 복사해두기 (예: `postgresql://postgres:[PASSWORD]@...`)
-   - `[PASSWORD]` 부분을 아까 설정한 비밀번호로 바꿔야 합니다.
+이제 로그인 없이 서버에 연결됩니다.
 
-## 3단계: 서버 배포하기 (Render)
-
-1. [Render.com](https://render.com) 접속 -> **Get Started** (GitHub 아이디로 로그인)
-2. **New +** 버튼 -> **Blueprints** 클릭
-3. **Connect a repository** -> 방금 올린 `stock-alert-app` 선택 -> **Connect**
-4. `Service Group Name`에 `stock-alert-service` 입력 -> **Apply** 클릭
-5. 환경 변수 입력 창이 뜨면 다음 내용 채우기:
-   - `DATABASE_URL`: 아까 Supabase에서 복사한 주소 붙여넣기
-   - `SUPABASE_URL`: Supabase 프로젝트 URL (Settings -> API에서 확인)
-   - `SUPABASE_KEY`: Supabase anon key (Settings -> API에서 확인)
-   - 나머지 APNS 관련은 일단 비워두거나 나중에 설정해도 됩니다.
-6. 배포가 시작됩니다. 약 5~10분 정도 걸립니다.
-7. 배포가 완료되면 `https://stock-alert-api-xxxx.onrender.com` 같은 주소가 생깁니다. 이 주소를 복사하세요.
-
-## 4단계: 아이폰 앱에 주소 넣기
-
-1. Cursor에서 `frontend/StockAlertApp/Services/NetworkService.swift` 파일 열기
-2. 아래 부분을 찾아서 변경:
-```swift
-#if DEBUG
-return "http://localhost:8000"
-#else
-// 여기를 아까 복사한 Render 주소로 변경!
-return "https://stock-alert-api-xxxx.onrender.com"
-#endif
+## 5. Quick Check
+```bash
+curl https://YOUR_RENDER_APP.onrender.com/health
+curl https://YOUR_RENDER_APP.onrender.com/watchlist -H "X-Admin-Key: YOUR_ADMIN_API_KEY"
 ```
-3. 앱을 다시 빌드해서 아이폰에 넣으면 끝!
 
----
-
-## 💡 팁
-- 이제 터미널을 닫고 PC를 꺼도 Render 서버와 Supabase DB가 알아서 돌아갑니다.
-- 비용은 **완전 0원**입니다.
-- 앱 업데이트가 필요하면 코드를 수정하고 `git push`만 하면 자동으로 서버도 업데이트됩니다.
-
+## 6. Test Rule
+- 테스트 DB도 로컬 SQLite를 쓰지 않습니다.
+- `TEST_DATABASE_URL` 은 Hosted PostgreSQL이어야 합니다.
+- 운영 DB URL을 테스트에 재사용하지 마세요.

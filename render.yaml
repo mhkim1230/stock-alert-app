@@ -11,37 +11,38 @@ services:
       cd backend
       python -m uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: DEBUG
-        value: false
       - key: PYTHON_VERSION
         value: "3.9"
+      - key: DEBUG
+        value: false
+      - key: AUTO_CREATE_TABLES
+        value: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: stock-alert-db
-          property: connectionString
-      - key: SUPABASE_URL
         sync: false
-      - key: SUPABASE_KEY
+      - key: ADMIN_API_KEY
         sync: false
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: REQUEST_TIMEOUT
+        value: "10"
       - key: APNS_KEY_ID
         sync: false
       - key: APNS_TEAM_ID
         sync: false
       - key: APNS_BUNDLE_ID
         value: com.stockalert.app
-      - key: APNS_KEY_PATH
+      - key: APNS_PRIVATE_KEY
         sync: false
-      - key: APNS_SANDBOX
+      - key: APNS_USE_SANDBOX
         value: true
-      - key: NAVER_CLIENT_ID
-        sync: false
-      - key: NAVER_CLIENT_SECRET
-        sync: false
     healthCheckPath: /health
 
-databases:
-  - name: stock-alert-db
-    plan: free
-    databaseName: stockalert
-    user: stockalert_user
-
+  - type: cron
+    name: stock-alert-alert-cron
+    env: bash
+    schedule: "*/5 * * * *"
+    buildCommand: "echo cron ready"
+    startCommand: "curl -X POST https://YOUR_RENDER_APP.onrender.com/internal/run-alert-checks -H \"X-Admin-Key: $ADMIN_API_KEY\""
+    envVars:
+      - key: ADMIN_API_KEY
+        sync: false

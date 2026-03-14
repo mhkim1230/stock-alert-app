@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @StateObject private var viewModel = StockViewModel()
+    @EnvironmentObject var viewModel: StockViewModel
     
     var body: some View {
         TabView {

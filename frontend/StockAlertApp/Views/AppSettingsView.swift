@@ -5,6 +5,8 @@ struct AppSettingsView: View {
     @AppStorage("darkMode") private var darkMode = false
     @AppStorage("notificationsEnabled") private var notificationsEnabled = true
     @AppStorage("updateFrequency") private var updateFrequency = 5 // 분 단위
+    @AppStorage("appServerBaseURL") private var appServerBaseURL = ""
+    @AppStorage("adminApiKey") private var adminApiKey = ""
     @State private var showingNotificationAlert = false
     
     var body: some View {
@@ -36,6 +38,21 @@ struct AppSettingsView: View {
                         Text("30분").tag(30)
                         Text("1시간").tag(60)
                     }
+                }
+
+                Section(header: Text("서버 연결")) {
+                    TextField("https://your-render-app.onrender.com", text: $appServerBaseURL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+
+                    SecureField("Admin API Key", text: $adminApiKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+
+                    Text("회원가입/로그인 없이 이 값으로 서버 API에 접근합니다.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
                 
                 Section(header: Text("알림 설정")) {
@@ -144,7 +161,10 @@ struct WatchlistView: View {
     }
     
     private func deleteStock(at offsets: IndexSet) {
-        // 관심 주식 삭제 로직
+        offsets.forEach { index in
+            let stock = viewModel.stocks[index]
+            viewModel.removeWatchlist(symbol: stock.symbol)
+        }
     }
     
     private func deleteCurrency(at offsets: IndexSet) {
@@ -214,4 +234,4 @@ struct AppSettingsView_Previews: PreviewProvider {
     static var previews: some View {
         AppSettingsView()
     }
-} 
+}

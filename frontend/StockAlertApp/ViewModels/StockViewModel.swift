@@ -12,6 +12,7 @@ class StockViewModel: ObservableObject {
     @Published var currencyHistoricalRates: [CurrencyRate] = []
     @Published var investmentRecommendations: [InvestmentRecommendation] = []
     @Published var selectedStockAnalysis: InvestmentAnalysis?
+    @Published var lastErrorMessage: String?
     
     private var cancellables = Set<AnyCancellable>()
     private let networkService = NetworkService()
@@ -27,12 +28,13 @@ class StockViewModel: ObservableObject {
         // 주식 데이터 가져오기
         networkService.fetchStocks()
             .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { completion in
+            .sink(receiveCompletion: { [weak self] completion in
                 switch completion {
                 case .finished:
                     break
                 case .failure(let error):
                     print("주식 데이터 로딩 실패: \(error)")
+                    self?.lastErrorMessage = "주식 데이터 로딩 실패"
                 }
             }, receiveValue: { [weak self] fetchedStocks in
                 self?.stocks = fetchedStocks
@@ -43,16 +45,45 @@ class StockViewModel: ObservableObject {
         // 환율 데이터 가져오기
         networkService.fetchCurrencies()
             .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { completion in
+            .sink(receiveCompletion: { [weak self] completion in
                 switch completion {
                 case .finished:
                     break
                 case .failure(let error):
                     print("환율 데이터 로딩 실패: \(error)")
+                    self?.lastErrorMessage = "환율 데이터 로딩 실패"
                 }
             }, receiveValue: { [weak self] fetchedCurrencies in
                 self?.currencies = fetchedCurrencies
                 self?.checkCurrencyAlerts()
+            })
+            .store(in: &cancellables)
+    }
+
+    func addToWatchlist(symbol: String) {
+        networkService.addWatchlistSymbol(symbol)
+            .receive(on: DispatchQueue.main)
+            .sink(receiveCompletion: { [weak self] completion in
+                if case .failure(let error) = completion {
+                    print("관심종목 추가 실패: \(error)")
+                    self?.lastErrorMessage = "관심종목 추가 실패"
+                }
+            }, receiveValue: { [weak self] _ in
+                self?.fetchStocksAndCurrencies()
+            })
+            .store(in: &cancellables)
+    }
+
+    func removeWatchlist(symbol: String) {
+        networkService.removeWatchlistSymbol(symbol)
+            .receive(on: DispatchQueue.main)
+            .sink(receiveCompletion: { [weak self] completion in
+                if case .failure(let error) = completion {
+                    print("관심종목 삭제 실패: \(error)")
+                    self?.lastErrorMessage = "관심종목 삭제 실패"
+                }
+            }, receiveValue: { [weak self] _ in
+                self?.fetchStocksAndCurrencies()
             })
             .store(in: &cancellables)
     }
@@ -70,12 +101,13 @@ class StockViewModel: ObservableObject {
     func fetchNewsForStock(_ stock: Stock) {
         networkService.fetchNewsForStock(stock.symbol)
             .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { completion in
+            .sink(receiveCompletion: { [weak self] completion in
                 switch completion {
                 case .finished:
                     break
                 case .failure(let error):
                     print("뉴스 로딩 실패: \(error)")
+                    self?.lastErrorMessage = "뉴스 로딩 실패"
                 }
             }, receiveValue: { [weak self] news in
                 self?.stockNews = news
@@ -168,12 +200,13 @@ class StockViewModel: ObservableObject {
     func fetchStockHistoricalData(_ stock: Stock) {
         networkService.fetchStockHistoricalData(stock.symbol)
             .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { completion in
+            .sink(receiveCompletion: { [weak self] completion in
                 switch completion {
                 case .finished:
                     break
                 case .failure(let error):
                     print("주식 과거 데이터 로딩 실패: \(error)")
+                    self?.lastErrorMessage = "주식 과거 데이터 로딩 실패"
                 }
             }, receiveValue: { [weak self] historicalPrices in
                 self?.stockHistoricalPrices = historicalPrices
@@ -185,12 +218,13 @@ class StockViewModel: ObservableObject {
     func fetchCurrencyHistoricalData(_ currency: Currency) {
         networkService.fetchCurrencyHistoricalData(currency.code)
             .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { completion in
+            .sink(receiveCompletion: { [weak self] completion in
                 switch completion {
                 case .finished:
                     break
                 case .failure(let error):
                     print("환율 과거 데이터 로딩 실패: \(error)")
+                    self?.lastErrorMessage = "환율 과거 데이터 로딩 실패"
                 }
             }, receiveValue: { [weak self] historicalRates in
                 self?.currencyHistoricalRates = historicalRates

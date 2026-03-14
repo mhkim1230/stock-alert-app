@@ -1,66 +1,58 @@
-from typing import Dict, Any, Optional
-import aiohttp
-import json
+import logging
+from typing import Any, Dict, List, Optional
+
+from src.services.naver_stock_service import NaverStockService
+
 
 class StockService:
-    """주식 서비스"""
-    
-    def __init__(self):
-        """초기화"""
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-    
-    async def get_stock_price(self, symbol: str) -> Optional[float]:
-        """주식 가격 조회"""
-        # Yahoo Finance API URL
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=self.headers) as response:
-                    if response.status != 200:
-                        return None
-                    
-                    data = await response.json()
-                    
-                    # 현재가 추출
-                    if 'chart' in data and 'result' in data['chart'] and data['chart']['result']:
-                        result = data['chart']['result'][0]
-                        if 'meta' in result and 'regularMarketPrice' in result['meta']:
-                            return float(result['meta']['regularMarketPrice'])
-                    
-                    return None
-        except Exception:
+    def __init__(self) -> None:
+        self.logger = logging.getLogger(__name__)
+        self.naver = NaverStockService()
+
+    async def search_stocks(self, query: str) -> List[Dict[str, Any]]:
+        results = await self.naver.search_stock(query)
+        normalized: List[Dict[str, Any]] = []
+        for item in results:
+            price = self._coerce_float(item.get("current_price") or item.get("price"))
+            if price is None:
+                continue
+            normalized.append(
+                {
+                    "symbol": str(item.get("symbol") or item.get("code") or query).upper(),
+                    "name": str(item.get("name") or item.get("stock_name") or query),
+                    "price": price,
+                    "change": self._coerce_float(item.get("change")),
+                    "change_percent": self._coerce_float(
+                        item.get("change_percent") or item.get("changeRate")
+                    ),
+                    "currency": item.get("currency", "KRW"),
+                    "source": item.get("source", "naver"),
+                }
+            )
+        return normalized
+
+    async def get_stock_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
+        results = await self.search_stocks(symbol)
+        for item in results:
+            if item["symbol"].upper() == symbol.upper():
+                return item
+        return results[0] if results else None
+
+    @staticmethod
+    def _coerce_float(value: Any) -> Optional[float]:
+        if value is None or value == "":
             return None
-    
-    async def get_stock_info(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """주식 정보 조회"""
-        # Yahoo Finance API URL
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-        
+        if isinstance(value, (int, float)):
+            return float(value)
+        cleaned = (
+            str(value)
+            .replace(",", "")
+            .replace("%", "")
+            .replace("$", "")
+            .replace("₩", "")
+            .strip()
+        )
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=self.headers) as response:
-                    if response.status != 200:
-                        return None
-                    
-                    data = await response.json()
-                    
-                    if 'chart' in data and 'result' in data['chart'] and data['chart']['result']:
-                        result = data['chart']['result'][0]
-                        meta = result.get('meta', {})
-                        
-                        return {
-                            'symbol': symbol,
-                            'price': meta.get('regularMarketPrice'),
-                            'change': meta.get('regularMarketChange'),
-                            'change_percent': meta.get('regularMarketChangePercent'),
-                            'volume': meta.get('regularMarketVolume'),
-                            'market_cap': meta.get('marketCap'),
-                            'currency': meta.get('currency')
-                        }
-                    
-                    return None
-        except Exception:
-            return None 
+            return float(cleaned)
+        except ValueError:
+            return None

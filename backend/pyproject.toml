@@ -8,11 +8,13 @@ version = "0.1.0"
 description = "Stock and Currency Alert Application"
 requires-python = ">=3.9"
 dependencies = [
-    "yfinance",
-    "forex-python",
     "apns2",
     "fastapi",
     "pydantic",
+    "sqlalchemy",
+    "asyncpg",
+    "aiohttp",
+    "feedparser",
 ]
 
 [tool.setuptools]

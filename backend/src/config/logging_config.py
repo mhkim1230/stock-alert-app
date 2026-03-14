@@ -40,6 +40,7 @@ def configure_logging(log_level=logging.INFO):
     logging.getLogger('uvicorn').setLevel(logging.WARNING)
     logging.getLogger('fastapi').setLevel(logging.WARNING)
     logging.getLogger('peewee').setLevel(logging.WARNING)
+    logging.getLogger('sqlalchemy').setLevel(logging.WARNING)
 
 def get_logger(name):
     """특정 이름의 로거 반환"""
