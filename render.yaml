@@ -36,13 +36,3 @@ services:
       - key: APNS_USE_SANDBOX
         value: true
     healthCheckPath: /health
-
-  - type: cron
-    name: stock-alert-alert-cron
-    env: bash
-    schedule: "*/5 * * * *"
-    buildCommand: "echo cron ready"
-    startCommand: "curl -X POST https://YOUR_RENDER_APP.onrender.com/internal/run-alert-checks -H \"X-Admin-Key: $ADMIN_API_KEY\""
-    envVars:
-      - key: ADMIN_API_KEY
-        sync: false

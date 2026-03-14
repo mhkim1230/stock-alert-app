@@ -28,7 +28,7 @@
 - `APNS_USE_SANDBOX=true`
 
 ## 3. Cron
-Render cron service의 호출 URL을 실제 웹서비스 주소로 바꿉니다.
+웹서비스 배포가 끝난 뒤 Render 대시보드에서 Cron Job을 별도로 추가합니다.
 
 예:
 ```bash
