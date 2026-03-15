@@ -385,6 +385,7 @@ button:disabled {
   padding: 0;
   display: grid;
   gap: 8px;
+  align-content: start;
 }
 
 .resource-list > li,
