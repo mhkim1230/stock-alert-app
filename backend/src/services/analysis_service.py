@@ -1352,7 +1352,7 @@ class AnalysisService:
             "russia": ("우크라이나 전쟁", -2),
             "gaza": ("중동 전쟁", -2),
             "israel": ("중동 전쟁", -2),
-            "iran": ("중동 긴장", -2),
+            "iran": ("미국-이란 긴장", -2),
             "red sea": ("중동 긴장", -2),
             "sanction": ("제재 리스크", -1),
             "oil": ("유가 변동성", -1 if asset_type == "stock" else 0),

@@ -755,7 +755,7 @@ button:disabled {
 .analysis-body {
   display: grid;
   gap: 10px;
-  padding-top: 4px;
+  padding-top: 18px;
 }
 
 .analysis-grid {
@@ -1070,7 +1070,7 @@ button:disabled {
   }
 
   .analysis-body {
-    padding-top: 8px;
+    padding-top: 22px;
   }
 
   .modal-sticky-head .eyebrow {
