@@ -16,6 +16,7 @@ const state = {
   selectedAlertSymbol: "",
   selectedFxPair: null,
   lastFxLookup: { base: "USD", target: "KRW" },
+  currentFxResult: null,
   analysisContext: null,
   openSwipeId: "",
 };
@@ -521,6 +522,14 @@ function renderCurrentFxResult(payload) {
   bindSwipeCards();
 }
 
+function renderCurrentFxResultFromState() {
+  if (state.currentFxResult) {
+    renderCurrentFxResult(state.currentFxResult);
+    return;
+  }
+  renderFxSelectionError("조회 결과가 없습니다.");
+}
+
 function renderFxSelectionError(message) {
   elements.fxResult.innerHTML = `<div class="callout">${message}</div>`;
 }
@@ -765,6 +774,7 @@ function bindSwipeCards() {
 
 function renderAll() {
   renderStats();
+  renderCurrentFxResultFromState();
   renderStockWatchlist();
   renderFxWatchlist();
   renderNotifications(elements.settingsNotifications);
@@ -1007,6 +1017,7 @@ async function handleFxLookup(event) {
 
 async function handleFxLookupWithPair(base, target) {
   state.lastFxLookup = { base, target };
+  state.currentFxResult = null;
   closeSwipeActions();
 
   if (!FX_OPTIONS.includes(base) || !FX_OPTIONS.includes(target)) {
@@ -1023,8 +1034,10 @@ async function handleFxLookupWithPair(base, target) {
     const payload = await request(`/currency/rate?base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`, {
       loadingMessage: "환율을 조회하는 중입니다...",
     });
-    renderCurrentFxResult(payload);
+    state.currentFxResult = payload;
+    renderCurrentFxResultFromState();
   } catch (error) {
+    state.currentFxResult = null;
     showLoadingCard(elements.fxResult, error.message);
     showToast(error.message, "error");
   }
@@ -1456,7 +1469,6 @@ function setupServiceWorker() {
 }
 
 document.getElementById("stock-search-form").addEventListener("submit", handleStockSearch);
-document.getElementById("fx-form").addEventListener("submit", handleFxLookup);
 document.getElementById("quick-stock-alert-form").addEventListener("submit", handleQuickStockAlertSubmit);
 document.getElementById("quick-news-alert-form").addEventListener("submit", handleQuickNewsAlertSubmit);
 document.getElementById("quick-fx-alert-form").addEventListener("submit", handleQuickFxAlertSubmit);
