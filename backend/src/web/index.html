@@ -58,29 +58,14 @@
 
           <div class="content-grid">
             <section class="view active" data-view-panel="dashboard">
-              <div class="dashboard-stack">
-                <article class="panel-card hero-card">
-                  <div class="panel-head">
-                    <div>
-                      <p class="eyebrow">오늘 요약</p>
-                      <h3>한눈에 보기</h3>
-                    </div>
-                    <button id="refresh-dashboard" class="ghost-button small" type="button">새로고침</button>
-                  </div>
-                  <p class="hero-note">관심종목, 환율, 알림 현황을 빠르게 확인하는 화면입니다.</p>
-                  <div id="summary-grid" class="summary-grid"></div>
-                  <div class="quick-actions">
-                    <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
-                  </div>
-                </article>
-
-                <div class="panel-grid dashboard-grid">
+              <div class="panel-grid dashboard-grid">
                 <article class="panel-card compact-panel">
                   <div class="panel-head">
                     <div>
                       <p class="eyebrow">환율</p>
                       <h3>환율 조회</h3>
                     </div>
+                    <button id="refresh-dashboard" class="ghost-button small" type="button">새로고침</button>
                   </div>
                   <form id="fx-form" class="inline-form compact-form">
                     <label class="field">
@@ -103,6 +88,21 @@
                     저장한 관심환율은 여기서 바로 상세분석, 알림, 삭제를 관리합니다.
                   </div>
                   <ul id="fx-watchlist-list" class="resource-list scroll-area tall"></ul>
+                </article>
+
+                <article class="panel-card compact-panel">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">관심종목</p>
+                      <h3>주식 찾기</h3>
+                    </div>
+                  </div>
+                  <div class="callout compact-callout">
+                    종목 검색으로 관심주식을 추가하고, 관심종목 탭에서 상세분석과 알림을 관리할 수 있습니다.
+                  </div>
+                  <div class="quick-actions">
+                    <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
+                  </div>
                 </article>
 
                 <article class="panel-card compact-panel">
@@ -131,7 +131,6 @@
                   </form>
                   <ul id="news-results" class="news-list scroll-area"></ul>
                 </article>
-                </div>
               </div>
             </section>
 

@@ -201,33 +201,6 @@ button:disabled {
   display: block;
 }
 
-.dashboard-stack {
-  display: grid;
-  gap: 18px;
-}
-
-.hero-card {
-  padding: 22px;
-  background: linear-gradient(180deg, #172234, #111a28);
-  color: #fff;
-}
-
-.hero-card .eyebrow,
-.hero-card .muted,
-.hero-card .ghost-button {
-  color: rgba(255, 255, 255, 0.76);
-}
-
-.hero-card .ghost-button {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.hero-note {
-  margin: 0 0 16px;
-  color: rgba(255, 255, 255, 0.72);
-  line-height: 1.6;
-}
-
 .dashboard-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -246,12 +219,7 @@ button:disabled {
   padding: 14px;
   border-radius: var(--radius-md);
   background: var(--surface-soft);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.hero-card .stat-card {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(25, 34, 52, 0.06);
 }
 
 .stat-card small {
@@ -264,8 +232,9 @@ button:disabled {
 .stat-card strong {
   display: block;
   margin-top: 6px;
-  font-size: 1.55rem;
-  letter-spacing: -0.04em;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+  font-weight: 700;
 }
 
 .stat-card-action {
@@ -286,7 +255,7 @@ button:disabled {
 }
 
 .panel-head h3 {
-  font-size: 1.28rem;
+  font-size: 1.12rem;
 }
 
 .inline-form,
@@ -400,7 +369,7 @@ button:disabled {
 }
 
 .resource-title {
-  font-size: 1.18rem;
+  font-size: 1rem;
   line-height: 1.2;
   letter-spacing: -0.03em;
 }
@@ -419,9 +388,9 @@ button:disabled {
 }
 
 .quote-price {
-  font-size: 1.42rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .quote-change {
@@ -664,8 +633,8 @@ button:disabled {
 }
 
 .analysis-price {
-  font-size: 1.4rem;
-  font-weight: 800;
+  font-size: 1rem;
+  font-weight: 700;
   white-space: nowrap;
 }
 

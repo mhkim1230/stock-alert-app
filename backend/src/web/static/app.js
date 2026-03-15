@@ -33,7 +33,6 @@ const elements = {
   settingsLogoutButton: document.getElementById("settings-logout-button"),
   installButton: document.getElementById("install-button"),
   settingsInstallButton: document.getElementById("settings-install-button"),
-  summaryGrid: document.getElementById("summary-grid"),
   watchlistList: document.getElementById("watchlist-list"),
   fxWatchlistList: document.getElementById("fx-watchlist-list"),
   dashboardNotifications: document.getElementById("dashboard-notifications"),
@@ -258,25 +257,7 @@ function fxRateMarkup(base, target) {
 }
 
 function renderStats() {
-  const cards = [
-    { label: "관심주식", value: state.watchlist.length },
-    { label: "관심환율", value: state.fxWatchlist.length },
-    { label: "주식 알림", value: state.stockAlerts.length },
-    { label: "환율 알림", value: state.currencyAlerts.length },
-    { label: "안 읽은 알림", value: state.unreadCount },
-  ];
-
-  const markup = cards
-    .map(
-      (card) => `
-        <div class="stat-card">
-          <small>${card.label}</small>
-          <strong>${card.value}</strong>
-        </div>
-      `
-    )
-    .join("");
-  elements.summaryGrid.innerHTML = markup;
+  return;
 }
 
 function renderStockWatchlist() {
@@ -879,8 +860,10 @@ async function handleFxLookup(event) {
       });
       elements.fxResult.innerHTML = `
         <div class="stat-card stat-card-action">
-          <small>${payload.source}</small>
-          <strong>${payload.base_currency}/${payload.target_currency} ${formatRate(payload.rate, payload.target_currency)}</strong>
+          <small class="meta-line">${payload.source}</small>
+          <div class="quote-line">
+            <span class="quote-price">${payload.base_currency}/${payload.target_currency} ${formatRate(payload.rate, payload.target_currency)}</span>
+          </div>
           <div class="resource-actions compact-actions">
             <button class="ghost-button small inline-action-button" type="button" data-action="add-current-fx-pair">관심환율 추가</button>
             <button class="ghost-button small inline-action-button" type="button" data-action="open-current-fx-analysis">상세분석</button>
