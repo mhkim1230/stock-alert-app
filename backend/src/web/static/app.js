@@ -1,5 +1,10 @@
+const FX_WATCHLIST_KEY = "stock-alert-fx-watchlist-v1";
+
 const state = {
   watchlist: [],
+  stockQuotes: {},
+  fxWatchlist: loadFxWatchlist(),
+  fxRates: {},
   stockAlerts: [],
   currencyAlerts: [],
   newsAlerts: [],
@@ -7,6 +12,8 @@ const state = {
   unreadCount: 0,
   installPrompt: null,
   selectedAlertSymbol: "",
+  selectedFxPair: null,
+  lastFxLookup: { base: "USD", target: "KRW" },
 };
 
 const loadingState = {
@@ -28,9 +35,7 @@ const elements = {
   summaryGrid: document.getElementById("summary-grid"),
   heroStats: document.getElementById("hero-stats"),
   watchlistList: document.getElementById("watchlist-list"),
-  stockAlertList: document.getElementById("stock-alert-list"),
-  currencyAlertList: document.getElementById("currency-alert-list"),
-  newsAlertList: document.getElementById("news-alert-list"),
+  fxWatchlistList: document.getElementById("fx-watchlist-list"),
   dashboardNotifications: document.getElementById("dashboard-notifications"),
   settingsNotifications: document.getElementById("settings-notifications"),
   stockSearchResults: document.getElementById("stock-search-results"),
@@ -41,9 +46,43 @@ const elements = {
   stockSearchQuery: document.getElementById("stock-search-query"),
   stockAlertModal: document.getElementById("stock-alert-modal"),
   selectedAlertSymbol: document.getElementById("selected-alert-symbol"),
+  selectedStockAlerts: document.getElementById("selected-stock-alerts"),
+  selectedNewsAlerts: document.getElementById("selected-news-alerts"),
   quickStockSymbol: document.getElementById("quick-stock-symbol"),
   quickNewsKeywords: document.getElementById("quick-news-keywords"),
+  fxAlertModal: document.getElementById("fx-alert-modal"),
+  selectedFxPair: document.getElementById("selected-fx-pair"),
+  selectedCurrencyAlerts: document.getElementById("selected-currency-alerts"),
+  quickFxBase: document.getElementById("quick-fx-base"),
+  quickFxTarget: document.getElementById("quick-fx-target"),
+  analysisModal: document.getElementById("analysis-modal"),
+  analysisBody: document.getElementById("analysis-body"),
 };
+
+function loadFxWatchlist() {
+  try {
+    const raw = localStorage.getItem(FX_WATCHLIST_KEY);
+    if (!raw) {
+      return [{ base: "USD", target: "KRW" }];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((item) => ({
+        base: String(item.base || "").toUpperCase(),
+        target: String(item.target || "").toUpperCase(),
+      }))
+      .filter((item) => item.base.length === 3 && item.target.length === 3);
+  } catch {
+    return [{ base: "USD", target: "KRW" }];
+  }
+}
+
+function saveFxWatchlist() {
+  localStorage.setItem(FX_WATCHLIST_KEY, JSON.stringify(state.fxWatchlist));
+}
 
 async function request(path, options = {}) {
   const { loadingMessage = "불러오는 중입니다...", skipLoading = false, ...fetchOptions } = options;
@@ -140,17 +179,26 @@ async function withButtonBusy(button, busyText, task) {
   }
 }
 
-function formatPrice(value, currency = "KRW") {
+function formatPrice(value, unit = "KRW") {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
     return "-";
   }
-
-  if (currency === "USD") {
+  if (unit === "KRW") {
+    return `${numeric.toLocaleString("ko-KR")}원`;
+  }
+  if (unit === "USD") {
     return `${numeric.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
   }
+  return `${numeric.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${unit}`;
+}
 
-  return `${numeric.toLocaleString("ko-KR")}원`;
+function formatRate(value, unit) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "-";
+  }
+  return `${numeric.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${unit}`;
 }
 
 function formatChangePercent(value) {
@@ -161,30 +209,19 @@ function formatChangePercent(value) {
   return `${numeric > 0 ? "+" : ""}${numeric.toFixed(2)}%`;
 }
 
-function showLoadingResult(target, message) {
+function toLocalDate(value) {
+  if (!value) {
+    return "-";
+  }
+  return new Date(value).toLocaleString("ko-KR");
+}
+
+function showLoadingList(target, message) {
   target.innerHTML = `<li class="empty-state loading-state">${message}</li>`;
 }
 
 function showLoadingCard(target, message) {
   target.innerHTML = `<div class="callout loading-state">${message}</div>`;
-}
-
-function submitOnEnter(event) {
-  if (event.key !== "Enter" || event.shiftKey) {
-    return;
-  }
-  const form = event.currentTarget.form;
-  if (!form) {
-    return;
-  }
-  event.preventDefault();
-  form.requestSubmit();
-}
-
-function setupEnterSubmit() {
-  document.querySelectorAll("input").forEach((input) => {
-    input.addEventListener("keydown", submitOnEnter);
-  });
 }
 
 function showToast(message, kind = "info") {
@@ -207,19 +244,59 @@ function setView(name) {
   window.location.hash = nextView;
 }
 
-function toLocalDate(value) {
-  if (!value) {
-    return "-";
+function setAssetView(name) {
+  document.querySelectorAll(".asset-tab-button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.assetView === name);
+  });
+  document.querySelectorAll(".asset-view").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.assetPanel === name);
+  });
+}
+
+function getStockAlertCount(symbol) {
+  return state.stockAlerts.filter((item) => item.stock_symbol === symbol).length;
+}
+
+function getNewsAlertCount(symbol) {
+  const normalized = symbol.toLowerCase();
+  return state.newsAlerts.filter((item) => item.keywords.toLowerCase().includes(normalized)).length;
+}
+
+function getCurrencyAlertCount(base, target) {
+  return state.currencyAlerts.filter(
+    (item) => item.base_currency === base && item.target_currency === target
+  ).length;
+}
+
+function stockQuoteMarkup(symbol) {
+  const quote = state.stockQuotes[symbol];
+  if (!quote) {
+    return `<small>시세를 아직 불러오지 못했습니다.</small>`;
   }
-  return new Date(value).toLocaleString("ko-KR");
+  return `
+    <small>${quote.market || "-"} · ${formatPrice(quote.price, quote.currency || "KRW")}</small>
+    <small>${formatChangePercent(quote.change_percent)}</small>
+  `;
+}
+
+function fxRateMarkup(base, target) {
+  const key = `${base}/${target}`;
+  const rate = state.fxRates[key];
+  if (!rate) {
+    return `<small>현재 환율을 아직 불러오지 못했습니다.</small>`;
+  }
+  return `
+    <small>${formatRate(rate.rate, target)}</small>
+    <small>${rate.source}</small>
+  `;
 }
 
 function renderStats() {
   const cards = [
-    { label: "관심종목", value: state.watchlist.length },
+    { label: "관심주식", value: state.watchlist.length },
+    { label: "관심환율", value: state.fxWatchlist.length },
     { label: "주식 알림", value: state.stockAlerts.length },
     { label: "환율 알림", value: state.currencyAlerts.length },
-    { label: "뉴스 알림", value: state.newsAlerts.length },
     { label: "안 읽은 알림", value: state.unreadCount },
   ];
 
@@ -237,49 +314,67 @@ function renderStats() {
   elements.heroStats.innerHTML = markup;
 }
 
-function renderWatchlist() {
+function renderStockWatchlist() {
   if (!state.watchlist.length) {
-    elements.watchlistList.innerHTML = `<li class="empty-state">아직 관심종목이 없습니다. 종목 검색 팝업에서 바로 추가해 주세요.</li>`;
+    elements.watchlistList.innerHTML =
+      `<li class="empty-state">아직 관심종목이 없습니다. 종목 검색으로 먼저 추가해 주세요.</li>`;
     return;
   }
 
   elements.watchlistList.innerHTML = state.watchlist
-    .map(
-      (item) => `
-        <li class="resource-item">
+    .map((item) => {
+      const stockAlerts = getStockAlertCount(item.symbol);
+      const newsAlerts = getNewsAlertCount(item.symbol);
+      const market = state.stockQuotes[item.symbol]?.market || "";
+      return `
+        <li class="resource-item quote-item">
           <div class="resource-meta">
             <strong>${item.symbol}</strong>
-            <small>관심종목 등록 ${toLocalDate(item.created_at)}</small>
+            ${stockQuoteMarkup(item.symbol)}
+            <div class="pill-row">
+              <span class="result-pill">주식알림 ${stockAlerts}</span>
+              <span class="result-pill">뉴스알림 ${newsAlerts}</span>
+            </div>
           </div>
           <div class="resource-actions">
+            <button class="ghost-button small" type="button" data-action="open-stock-analysis" data-symbol="${item.symbol}" data-market="${market}">상세분석</button>
             <button class="ghost-button small" type="button" data-action="open-alert-modal" data-symbol="${item.symbol}">알림</button>
             <button class="danger-button" type="button" data-action="delete-watchlist" data-symbol="${item.symbol}">삭제</button>
           </div>
         </li>
-      `
-    )
+      `;
+    })
     .join("");
 }
 
-function renderAlertList(target, items, formatter, deleteAction) {
-  if (!items.length) {
-    target.innerHTML = `<li class="empty-state">등록된 항목이 없습니다.</li>`;
+function renderFxWatchlist() {
+  if (!state.fxWatchlist.length) {
+    elements.fxWatchlistList.innerHTML =
+      `<li class="empty-state">관심환율이 없습니다. USD/KRW 같은 페어를 저장해 주세요.</li>`;
     return;
   }
 
-  target.innerHTML = items
-    .map(
-      (item) => `
-        <li class="resource-item">
+  elements.fxWatchlistList.innerHTML = state.fxWatchlist
+    .map((item) => {
+      const pair = `${item.base}/${item.target}`;
+      const alertCount = getCurrencyAlertCount(item.base, item.target);
+      return `
+        <li class="resource-item quote-item">
           <div class="resource-meta">
-            <strong>${formatter(item)}</strong>
-            <small>등록 ${toLocalDate(item.created_at)}</small>
-            ${item.triggered_at ? `<small>마지막 트리거 ${toLocalDate(item.triggered_at)}</small>` : ""}
+            <strong>${pair}</strong>
+            ${fxRateMarkup(item.base, item.target)}
+            <div class="pill-row">
+              <span class="result-pill">환율알림 ${alertCount}</span>
+            </div>
           </div>
-          <button class="danger-button" type="button" data-action="${deleteAction}" data-id="${item.id}">삭제</button>
+          <div class="resource-actions">
+            <button class="ghost-button small" type="button" data-action="open-fx-analysis" data-base="${item.base}" data-target="${item.target}">상세분석</button>
+            <button class="ghost-button small" type="button" data-action="open-fx-alert-modal" data-base="${item.base}" data-target="${item.target}">알림</button>
+            <button class="danger-button" type="button" data-action="delete-fx-watchlist" data-base="${item.base}" data-target="${item.target}">삭제</button>
+          </div>
         </li>
-      `
-    )
+      `;
+    })
     .join("");
 }
 
@@ -303,29 +398,142 @@ function renderNotifications(listTarget, items = state.notifications) {
     .join("");
 }
 
+function renderSelectedStockAlerts() {
+  const symbol = state.selectedAlertSymbol;
+  const stockAlerts = state.stockAlerts.filter((item) => item.stock_symbol === symbol);
+  const newsAlerts = state.newsAlerts.filter((item) => item.keywords.toLowerCase().includes(symbol.toLowerCase()));
+
+  elements.selectedStockAlerts.innerHTML = stockAlerts.length
+    ? stockAlerts
+        .map(
+          (item) => `
+            <li class="resource-item compact-item">
+              <div class="resource-meta">
+                <strong>${item.condition} ${item.target_price}</strong>
+                <small>등록 ${toLocalDate(item.created_at)}</small>
+              </div>
+              <button class="danger-button" type="button" data-action="delete-stock-alert" data-id="${item.id}">삭제</button>
+            </li>
+          `
+        )
+        .join("")
+    : `<li class="empty-state">등록된 주식 알림이 없습니다.</li>`;
+
+  elements.selectedNewsAlerts.innerHTML = newsAlerts.length
+    ? newsAlerts
+        .map(
+          (item) => `
+            <li class="resource-item compact-item">
+              <div class="resource-meta">
+                <strong>${item.keywords}</strong>
+                <small>등록 ${toLocalDate(item.created_at)}</small>
+              </div>
+              <button class="danger-button" type="button" data-action="delete-news-alert" data-id="${item.id}">삭제</button>
+            </li>
+          `
+        )
+        .join("")
+    : `<li class="empty-state">등록된 뉴스 알림이 없습니다.</li>`;
+}
+
+function renderSelectedCurrencyAlerts() {
+  const selected = state.selectedFxPair;
+  if (!selected) {
+    elements.selectedCurrencyAlerts.innerHTML = `<li class="empty-state">선택된 환율이 없습니다.</li>`;
+    return;
+  }
+
+  const items = state.currencyAlerts.filter(
+    (item) => item.base_currency === selected.base && item.target_currency === selected.target
+  );
+
+  elements.selectedCurrencyAlerts.innerHTML = items.length
+    ? items
+        .map(
+          (item) => `
+            <li class="resource-item compact-item">
+              <div class="resource-meta">
+                <strong>${item.condition} ${item.target_rate}</strong>
+                <small>등록 ${toLocalDate(item.created_at)}</small>
+              </div>
+              <button class="danger-button" type="button" data-action="delete-currency-alert" data-id="${item.id}">삭제</button>
+            </li>
+          `
+        )
+        .join("")
+    : `<li class="empty-state">등록된 환율 알림이 없습니다.</li>`;
+}
+
+function renderAnalysis(data) {
+  const formatter = data.asset_type === "currency" ? formatRate : formatPrice;
+  elements.analysisBody.innerHTML = `
+    <div class="analysis-hero">
+      <div>
+        <p class="eyebrow">${data.timeframe}</p>
+        <h4>${data.name}</h4>
+        <p class="muted">${data.symbol} · ${data.trend} · ${data.bias}</p>
+      </div>
+      <div class="analysis-price">${formatter(data.current_price, data.price_unit)}</div>
+    </div>
+    <div class="analysis-grid">
+      <div class="stat-card"><small>1차 매수가</small><strong>${formatter(data.first_buy, data.price_unit)}</strong></div>
+      <div class="stat-card"><small>2차 매수가</small><strong>${formatter(data.second_buy, data.price_unit)}</strong></div>
+      <div class="stat-card"><small>1차 매도가</small><strong>${formatter(data.first_sell, data.price_unit)}</strong></div>
+      <div class="stat-card"><small>2차 매도가</small><strong>${formatter(data.second_sell, data.price_unit)}</strong></div>
+      <div class="stat-card"><small>손절 기준</small><strong>${formatter(data.stop_loss, data.price_unit)}</strong></div>
+      <div class="stat-card"><small>데이터 소스</small><strong>${data.source}</strong></div>
+    </div>
+    <ul class="analysis-notes">
+      ${data.notes.map((note) => `<li>${note}</li>`).join("")}
+    </ul>
+  `;
+}
+
 function renderAll() {
   renderStats();
-  renderWatchlist();
-  renderAlertList(
-    elements.stockAlertList,
-    state.stockAlerts,
-    (item) => `${item.stock_symbol} ${item.condition} ${item.target_price}`,
-    "delete-stock-alert"
-  );
-  renderAlertList(
-    elements.currencyAlertList,
-    state.currencyAlerts,
-    (item) => `${item.base_currency}/${item.target_currency} ${item.condition} ${item.target_rate}`,
-    "delete-currency-alert"
-  );
-  renderAlertList(
-    elements.newsAlertList,
-    state.newsAlerts,
-    (item) => item.keywords,
-    "delete-news-alert"
-  );
+  renderStockWatchlist();
+  renderFxWatchlist();
   renderNotifications(elements.dashboardNotifications, state.notifications.slice(0, 5));
   renderNotifications(elements.settingsNotifications);
+  if (state.selectedAlertSymbol) {
+    renderSelectedStockAlerts();
+  }
+  if (state.selectedFxPair) {
+    renderSelectedCurrencyAlerts();
+  }
+}
+
+async function refreshStockQuotes() {
+  const quotes = await Promise.all(
+    state.watchlist.map(async (item) => {
+      try {
+        const quote = await request(`/stocks/${item.symbol}`, {
+          skipLoading: true,
+        });
+        return [item.symbol, quote];
+      } catch {
+        return [item.symbol, null];
+      }
+    })
+  );
+  state.stockQuotes = Object.fromEntries(quotes);
+}
+
+async function refreshFxRates() {
+  const rates = await Promise.all(
+    state.fxWatchlist.map(async (pair) => {
+      try {
+        const payload = await request(
+          `/currency/rate?base=${encodeURIComponent(pair.base)}&target=${encodeURIComponent(pair.target)}`,
+          { skipLoading: true }
+        );
+        return [`${pair.base}/${pair.target}`, payload];
+      } catch {
+        return [`${pair.base}/${pair.target}`, null];
+      }
+    })
+  );
+  state.fxRates = Object.fromEntries(rates);
 }
 
 async function refreshData() {
@@ -344,6 +552,8 @@ async function refreshData() {
   state.newsAlerts = newsAlerts;
   state.notifications = notifications;
   state.unreadCount = unread.unread_count;
+
+  await Promise.all([refreshStockQuotes(), refreshFxRates()]);
   renderAll();
 }
 
@@ -358,7 +568,9 @@ function showLoggedOut() {
   elements.appPanel.classList.add("hidden");
   elements.logoutButton.classList.add("hidden");
   closeStockSearchModal();
-  closeAlertModal();
+  closeStockAlertModal();
+  closeFxAlertModal();
+  closeAnalysisModal();
 }
 
 async function bootstrap() {
@@ -397,28 +609,18 @@ async function handleLogin(event) {
 
 async function handleLogout() {
   await withButtonBusy(elements.logoutButton, "로그아웃 중...", async () => {
-    await request("/session/logout", { method: "POST", loadingMessage: "로그아웃하는 중입니다..." });
+    await request("/session/logout", {
+      method: "POST",
+      loadingMessage: "로그아웃하는 중입니다...",
+    });
   });
   showLoggedOut();
   showToast("로그아웃되었습니다.", "info");
 }
 
-async function handleWatchlistSubmit(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const formData = new FormData(form);
-  await request("/watchlist", {
-    method: "POST",
-    body: JSON.stringify({ symbol: formData.get("symbol") }),
-  });
-  form.reset();
-  await refreshData();
-  showToast("관심종목을 추가했습니다.", "success");
-}
-
 function openStockSearchModal(query = "") {
   elements.stockSearchModal.classList.remove("hidden");
-  if (typeof query === "string" && query) {
+  if (query) {
     elements.stockSearchQuery.value = query;
   }
   elements.stockSearchQuery.focus();
@@ -428,17 +630,41 @@ function closeStockSearchModal() {
   elements.stockSearchModal.classList.add("hidden");
 }
 
-function openAlertModal(symbol) {
+function openStockAlertModal(symbol) {
   state.selectedAlertSymbol = symbol;
   elements.selectedAlertSymbol.textContent = symbol;
   elements.quickStockSymbol.value = symbol;
   elements.quickNewsKeywords.value = symbol;
+  renderSelectedStockAlerts();
   elements.stockAlertModal.classList.remove("hidden");
 }
 
-function closeAlertModal() {
+function closeStockAlertModal() {
   state.selectedAlertSymbol = "";
   elements.stockAlertModal.classList.add("hidden");
+}
+
+function openFxAlertModal(base, target) {
+  state.selectedFxPair = { base, target };
+  elements.selectedFxPair.textContent = `${base}/${target}`;
+  elements.quickFxBase.value = base;
+  elements.quickFxTarget.value = target;
+  renderSelectedCurrencyAlerts();
+  elements.fxAlertModal.classList.remove("hidden");
+}
+
+function closeFxAlertModal() {
+  state.selectedFxPair = null;
+  elements.fxAlertModal.classList.add("hidden");
+}
+
+function openAnalysisModal() {
+  elements.analysisModal.classList.remove("hidden");
+}
+
+function closeAnalysisModal() {
+  elements.analysisModal.classList.add("hidden");
+  elements.analysisBody.innerHTML = "";
 }
 
 function renderStockSearchResults(results) {
@@ -450,14 +676,15 @@ function renderStockSearchResults(results) {
   elements.stockSearchResults.innerHTML = results
     .map(
       (item) => `
-        <li class="resource-item">
+        <li class="resource-item quote-item">
           <div class="resource-meta">
             <strong>${item.symbol} · ${item.name}</strong>
             <small>${item.market || "-"} · ${formatPrice(item.price, item.currency || "KRW")}</small>
             <small>${formatChangePercent(item.change_percent)} · ${item.source}</small>
           </div>
           <div class="resource-actions">
-            <button class="primary-button small-button" type="button" data-action="add-watchlist-symbol" data-symbol="${item.symbol}">관심종목 추가</button>
+            <button class="primary-button small-button" type="button" data-action="add-watchlist-symbol" data-symbol="${item.symbol}">추가</button>
+            <button class="ghost-button small" type="button" data-action="open-stock-analysis" data-symbol="${item.symbol}" data-market="${item.market || ""}">상세분석</button>
             <button class="ghost-button small" type="button" data-action="open-alert-modal" data-symbol="${item.symbol}">알림</button>
           </div>
         </li>
@@ -466,81 +693,13 @@ function renderStockSearchResults(results) {
     .join("");
 }
 
-async function handleStockAlertSubmit(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const formData = new FormData(form);
-  try {
-    await withFormBusy(form, "추가 중...", async () => {
-      await request("/alerts/stocks", {
-        method: "POST",
-        body: JSON.stringify({
-          stock_symbol: formData.get("stock_symbol"),
-          target_price: Number(formData.get("target_price")),
-          condition: formData.get("condition"),
-        }),
-        loadingMessage: "주식 알림을 추가하는 중입니다...",
-      });
-    });
-    form.reset();
-    await refreshData();
-    showToast("주식 알림을 추가했습니다.", "success");
-  } catch (error) {
-    showToast(error.message, "error");
-  }
-}
-
-async function handleCurrencyAlertSubmit(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const formData = new FormData(form);
-  try {
-    await withFormBusy(form, "추가 중...", async () => {
-      await request("/alerts/currencies", {
-        method: "POST",
-        body: JSON.stringify({
-          base_currency: formData.get("base_currency"),
-          target_currency: formData.get("target_currency"),
-          target_rate: Number(formData.get("target_rate")),
-          condition: formData.get("condition"),
-        }),
-        loadingMessage: "환율 알림을 추가하는 중입니다...",
-      });
-    });
-    form.reset();
-    await refreshData();
-    showToast("환율 알림을 추가했습니다.", "success");
-  } catch (error) {
-    showToast(error.message, "error");
-  }
-}
-
-async function handleNewsAlertSubmit(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const formData = new FormData(form);
-  try {
-    await withFormBusy(form, "추가 중...", async () => {
-      await request("/alerts/news", {
-        method: "POST",
-        body: JSON.stringify({ keywords: formData.get("keywords") }),
-        loadingMessage: "뉴스 알림을 추가하는 중입니다...",
-      });
-    });
-    form.reset();
-    await refreshData();
-    showToast("뉴스 알림을 추가했습니다.", "success");
-  } catch (error) {
-    showToast(error.message, "error");
-  }
-}
-
 async function handleStockSearch(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
   const query = formData.get("query");
-  showLoadingResult(elements.stockSearchResults, "종목을 조회하는 중입니다...");
+
+  showLoadingList(elements.stockSearchResults, "종목을 조회하는 중입니다...");
   try {
     await withFormBusy(form, "조회 중...", async () => {
       const payload = await request(`/stocks/search?query=${encodeURIComponent(query)}`, {
@@ -560,6 +719,8 @@ async function handleFxLookup(event) {
   const formData = new FormData(form);
   const base = String(formData.get("base")).toUpperCase();
   const target = String(formData.get("target")).toUpperCase();
+  state.lastFxLookup = { base, target };
+
   showLoadingCard(elements.fxResult, "환율을 조회하는 중입니다...");
   try {
     await withFormBusy(form, "조회 중...", async () => {
@@ -569,7 +730,7 @@ async function handleFxLookup(event) {
       elements.fxResult.innerHTML = `
         <div class="stat-card">
           <small>${payload.source}</small>
-          <strong>${payload.base_currency}/${payload.target_currency} ${payload.rate}</strong>
+          <strong>${payload.base_currency}/${payload.target_currency} ${formatRate(payload.rate, payload.target_currency)}</strong>
         </div>
       `;
     });
@@ -585,10 +746,13 @@ async function handleNewsSearch(event) {
   const formData = new FormData(form);
   const query = formData.get("query");
   const qs = query ? `?query=${encodeURIComponent(query)}` : "";
-  showLoadingResult(elements.newsResults, "뉴스를 불러오는 중입니다...");
+
+  showLoadingList(elements.newsResults, "뉴스를 불러오는 중입니다...");
   try {
     await withFormBusy(form, "조회 중...", async () => {
-      const payload = await request(`/news${qs}`, { loadingMessage: "뉴스를 불러오는 중입니다..." });
+      const payload = await request(`/news${qs}`, {
+        loadingMessage: "뉴스를 불러오는 중입니다...",
+      });
       if (!payload.length) {
         elements.newsResults.innerHTML = `<li class="empty-state">뉴스가 없습니다.</li>`;
         return;
@@ -612,10 +776,31 @@ async function handleNewsSearch(event) {
   }
 }
 
+async function handleFxWatchlistSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  const base = String(formData.get("base")).toUpperCase();
+  const target = String(formData.get("target")).toUpperCase();
+  const exists = state.fxWatchlist.some((item) => item.base === base && item.target === target);
+  if (exists) {
+    showToast("이미 저장된 환율 페어입니다.", "info");
+    return;
+  }
+
+  state.fxWatchlist.unshift({ base, target });
+  saveFxWatchlist();
+  form.reset();
+  await refreshFxRates();
+  renderAll();
+  showToast("관심환율을 저장했습니다.", "success");
+}
+
 async function handleQuickStockAlertSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
+
   try {
     await withFormBusy(form, "추가 중...", async () => {
       await request("/alerts/stocks", {
@@ -629,10 +814,9 @@ async function handleQuickStockAlertSubmit(event) {
       });
     });
     form.reset();
-    closeAlertModal();
+    elements.quickStockSymbol.value = state.selectedAlertSymbol;
     await refreshData();
-    setView("alerts");
-    setAlertView("stocks");
+    renderSelectedStockAlerts();
     showToast("주식 알림을 추가했습니다.", "success");
   } catch (error) {
     showToast(error.message, "error");
@@ -643,6 +827,7 @@ async function handleQuickNewsAlertSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
+
   try {
     await withFormBusy(form, "추가 중...", async () => {
       await request("/alerts/news", {
@@ -652,22 +837,88 @@ async function handleQuickNewsAlertSubmit(event) {
       });
     });
     form.reset();
-    closeAlertModal();
+    elements.quickNewsKeywords.value = state.selectedAlertSymbol;
     await refreshData();
-    setView("alerts");
-    setAlertView("news");
+    renderSelectedStockAlerts();
     showToast("뉴스 알림을 추가했습니다.", "success");
   } catch (error) {
     showToast(error.message, "error");
   }
 }
 
-function setAlertView(name) {
-  document.querySelectorAll(".sub-tab-button").forEach((button) => {
-    button.classList.toggle("active", button.dataset.alertView === name);
-  });
-  document.querySelectorAll(".alert-view").forEach((panel) => {
-    panel.classList.toggle("active", panel.dataset.alertPanel === name);
+async function handleQuickFxAlertSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+
+  try {
+    await withFormBusy(form, "추가 중...", async () => {
+      await request("/alerts/currencies", {
+        method: "POST",
+        body: JSON.stringify({
+          base_currency: formData.get("base_currency"),
+          target_currency: formData.get("target_currency"),
+          target_rate: Number(formData.get("target_rate")),
+          condition: formData.get("condition"),
+        }),
+        loadingMessage: "환율 알림을 추가하는 중입니다...",
+      });
+    });
+    form.reset();
+    elements.quickFxBase.value = state.selectedFxPair.base;
+    elements.quickFxTarget.value = state.selectedFxPair.target;
+    await refreshData();
+    renderSelectedCurrencyAlerts();
+    showToast("환율 알림을 추가했습니다.", "success");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+async function openStockAnalysis(symbol, market = "") {
+  openAnalysisModal();
+  showLoadingCard(elements.analysisBody, "주식 차트를 분석하는 중입니다...");
+  try {
+    const qs = market ? `?market=${encodeURIComponent(market)}` : "";
+    const payload = await request(`/analysis/stocks/${encodeURIComponent(symbol)}${qs}`, {
+      loadingMessage: "주식 상세분석을 준비하는 중입니다...",
+    });
+    renderAnalysis(payload);
+  } catch (error) {
+    showLoadingCard(elements.analysisBody, error.message);
+    showToast(error.message, "error");
+  }
+}
+
+async function openFxAnalysis(base, target) {
+  openAnalysisModal();
+  showLoadingCard(elements.analysisBody, "환율 흐름을 분석하는 중입니다...");
+  try {
+    const payload = await request(`/analysis/currencies/${encodeURIComponent(base)}/${encodeURIComponent(target)}`, {
+      loadingMessage: "환율 상세분석을 준비하는 중입니다...",
+    });
+    renderAnalysis(payload);
+  } catch (error) {
+    showLoadingCard(elements.analysisBody, error.message);
+    showToast(error.message, "error");
+  }
+}
+
+function submitOnEnter(event) {
+  if (event.key !== "Enter" || event.shiftKey) {
+    return;
+  }
+  const form = event.currentTarget.form;
+  if (!form) {
+    return;
+  }
+  event.preventDefault();
+  form.requestSubmit();
+}
+
+function setupEnterSubmit() {
+  document.querySelectorAll("input").forEach((input) => {
+    input.addEventListener("keydown", submitOnEnter);
   });
 }
 
@@ -682,27 +933,59 @@ async function handleListActions(event) {
     if (action === "open-stock-search") {
       openStockSearchModal();
       return;
-    } else if (action === "close-stock-search") {
+    }
+    if (action === "close-stock-search") {
       closeStockSearchModal();
       return;
-    } else if (action === "go-to-alerts") {
-      setView("alerts");
-      return;
-    } else if (action === "go-to-watchlist") {
-      closeAlertModal();
+    }
+    if (action === "go-to-fx-watchlist") {
       setView("watchlist");
+      setAssetView("fx");
       return;
-    } else if (action === "go-to-currency-alert") {
-      setView("alerts");
-      setAlertView("currencies");
+    }
+    if (action === "add-current-fx-pair") {
+      const { base, target } = state.lastFxLookup;
+      const exists = state.fxWatchlist.some((item) => item.base === base && item.target === target);
+      if (!exists) {
+        state.fxWatchlist.unshift({ base, target });
+        saveFxWatchlist();
+        await refreshFxRates();
+        renderAll();
+      }
+      setView("watchlist");
+      setAssetView("fx");
+      showToast("현재 환율 페어를 저장했습니다.", "success");
       return;
-    } else if (action === "open-alert-modal") {
-      openAlertModal(trigger.dataset.symbol);
+    }
+    if (action === "open-alert-modal") {
+      openStockAlertModal(trigger.dataset.symbol);
       return;
-    } else if (action === "close-alert-modal") {
-      closeAlertModal();
+    }
+    if (action === "close-alert-modal") {
+      closeStockAlertModal();
       return;
-    } else if (action === "add-watchlist-symbol") {
+    }
+    if (action === "open-fx-alert-modal") {
+      openFxAlertModal(trigger.dataset.base, trigger.dataset.target);
+      return;
+    }
+    if (action === "close-fx-alert-modal") {
+      closeFxAlertModal();
+      return;
+    }
+    if (action === "open-stock-analysis") {
+      await openStockAnalysis(trigger.dataset.symbol, trigger.dataset.market || "");
+      return;
+    }
+    if (action === "open-fx-analysis") {
+      await openFxAnalysis(trigger.dataset.base, trigger.dataset.target);
+      return;
+    }
+    if (action === "close-analysis-modal") {
+      closeAnalysisModal();
+      return;
+    }
+    if (action === "add-watchlist-symbol") {
       await withButtonBusy(trigger, "추가 중...", async () => {
         await request("/watchlist", {
           method: "POST",
@@ -712,49 +995,78 @@ async function handleListActions(event) {
       });
       closeStockSearchModal();
       setView("watchlist");
+      setAssetView("stocks");
+      await refreshData();
       showToast("관심종목을 추가했습니다.", "success");
-    } else if (action === "delete-watchlist") {
+      return;
+    }
+    if (action === "delete-watchlist") {
       await withButtonBusy(trigger, "삭제 중...", async () => {
         await request(`/watchlist/${trigger.dataset.symbol}`, {
           method: "DELETE",
           loadingMessage: "관심종목을 삭제하는 중입니다...",
         });
       });
+      await refreshData();
       showToast("관심종목을 삭제했습니다.", "info");
-    } else if (action === "delete-stock-alert") {
+      return;
+    }
+    if (action === "delete-fx-watchlist") {
+      state.fxWatchlist = state.fxWatchlist.filter(
+        (item) => !(item.base === trigger.dataset.base && item.target === trigger.dataset.target)
+      );
+      saveFxWatchlist();
+      await refreshFxRates();
+      renderAll();
+      showToast("관심환율을 삭제했습니다.", "info");
+      return;
+    }
+    if (action === "delete-stock-alert") {
       await withButtonBusy(trigger, "삭제 중...", async () => {
         await request(`/alerts/stocks/${trigger.dataset.id}`, {
           method: "DELETE",
           loadingMessage: "주식 알림을 삭제하는 중입니다...",
         });
       });
+      await refreshData();
+      renderSelectedStockAlerts();
       showToast("주식 알림을 삭제했습니다.", "info");
-    } else if (action === "delete-currency-alert") {
+      return;
+    }
+    if (action === "delete-currency-alert") {
       await withButtonBusy(trigger, "삭제 중...", async () => {
         await request(`/alerts/currencies/${trigger.dataset.id}`, {
           method: "DELETE",
           loadingMessage: "환율 알림을 삭제하는 중입니다...",
         });
       });
+      await refreshData();
+      renderSelectedCurrencyAlerts();
       showToast("환율 알림을 삭제했습니다.", "info");
-    } else if (action === "delete-news-alert") {
+      return;
+    }
+    if (action === "delete-news-alert") {
       await withButtonBusy(trigger, "삭제 중...", async () => {
         await request(`/alerts/news/${trigger.dataset.id}`, {
           method: "DELETE",
           loadingMessage: "뉴스 알림을 삭제하는 중입니다...",
         });
       });
+      await refreshData();
+      renderSelectedStockAlerts();
       showToast("뉴스 알림을 삭제했습니다.", "info");
-    } else if (action === "read-notification") {
+      return;
+    }
+    if (action === "read-notification") {
       await withButtonBusy(trigger, "처리 중...", async () => {
         await request(`/notifications/${trigger.dataset.id}/read`, {
           method: "PATCH",
           loadingMessage: "알림을 읽음 처리하는 중입니다...",
         });
       });
+      await refreshData();
       showToast("알림을 읽음 처리했습니다.", "success");
     }
-    await refreshData();
   } catch (error) {
     showToast(error.message, "error");
   }
@@ -787,14 +1099,12 @@ function setupRouting() {
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.addEventListener("click", () => setView(button.dataset.view));
   });
-
-  document.querySelectorAll(".sub-tab-button").forEach((button) => {
-    button.addEventListener("click", () => setAlertView(button.dataset.alertView));
+  document.querySelectorAll(".asset-tab-button").forEach((button) => {
+    button.addEventListener("click", () => setAssetView(button.dataset.assetView));
   });
-
   const initialView = window.location.hash.replace("#", "") || "dashboard";
   setView(initialView);
-  setAlertView("stocks");
+  setAssetView("stocks");
 }
 
 function setupServiceWorker() {
@@ -803,16 +1113,18 @@ function setupServiceWorker() {
   }
 }
 
-document.getElementById("currency-alert-form").addEventListener("submit", handleCurrencyAlertSubmit);
-document.getElementById("news-alert-form").addEventListener("submit", handleNewsAlertSubmit);
 document.getElementById("stock-search-form").addEventListener("submit", handleStockSearch);
 document.getElementById("fx-form").addEventListener("submit", handleFxLookup);
 document.getElementById("news-form").addEventListener("submit", handleNewsSearch);
+document.getElementById("fx-watchlist-form").addEventListener("submit", handleFxWatchlistSubmit);
 document.getElementById("quick-stock-alert-form").addEventListener("submit", handleQuickStockAlertSubmit);
 document.getElementById("quick-news-alert-form").addEventListener("submit", handleQuickNewsAlertSubmit);
+document.getElementById("quick-fx-alert-form").addEventListener("submit", handleQuickFxAlertSubmit);
 document.getElementById("app").addEventListener("click", handleListActions);
 document.getElementById("stock-search-modal").addEventListener("click", handleListActions);
 document.getElementById("stock-alert-modal").addEventListener("click", handleListActions);
+document.getElementById("fx-alert-modal").addEventListener("click", handleListActions);
+document.getElementById("analysis-modal").addEventListener("click", handleListActions);
 elements.loginForm.addEventListener("submit", handleLogin);
 elements.logoutButton.addEventListener("click", handleLogout);
 elements.settingsLogoutButton.addEventListener("click", handleLogout);

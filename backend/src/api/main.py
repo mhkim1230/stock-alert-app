@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from src.api.routes import (
+    analysis_routes,
     alert_routes,
     auth_routes,
     device_token_routes,
@@ -53,6 +54,7 @@ app.add_middleware(
 )
 
 app.include_router(session_routes.router)
+app.include_router(analysis_routes.router)
 app.include_router(alert_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(device_token_routes.router)

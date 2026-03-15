@@ -153,6 +153,24 @@ class NewsArticleResponse(BaseModel):
     source: str
 
 
+class TechnicalAnalysisResponse(BaseModel):
+    asset_type: str
+    symbol: str
+    name: str
+    current_price: float
+    price_unit: str
+    trend: str
+    bias: str
+    first_buy: float
+    second_buy: float
+    first_sell: float
+    second_sell: float
+    stop_loss: float
+    timeframe: str
+    source: str
+    notes: List[str]
+
+
 class InternalRunResponse(BaseModel):
     status: str
     triggered: int

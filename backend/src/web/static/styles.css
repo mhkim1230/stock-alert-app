@@ -150,7 +150,7 @@ a {
 
 .mobile-tabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 10px;
 }
@@ -290,6 +290,10 @@ button:disabled {
   gap: 8px;
 }
 
+.quote-item {
+  align-items: center;
+}
+
 .resource-meta {
   display: grid;
   gap: 4px;
@@ -332,6 +336,10 @@ button:disabled {
 
 .compact-callout {
   margin-bottom: 10px;
+}
+
+.compact-item {
+  padding: 10px 12px;
 }
 
 .callout.success {
@@ -400,14 +408,14 @@ button:disabled {
   max-height: min(44vh, 340px);
 }
 
-.sub-tabs {
+.asset-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   margin-bottom: 14px;
 }
 
-.sub-tab-button {
+.asset-tab-button {
   border: 1px solid rgba(17, 43, 31, 0.08);
   background: rgba(255, 250, 240, 0.7);
   color: var(--muted);
@@ -415,17 +423,17 @@ button:disabled {
   padding: 10px 12px;
 }
 
-.sub-tab-button.active {
+.asset-tab-button.active {
   background: rgba(17, 43, 31, 0.12);
   color: var(--text);
   border-color: rgba(17, 43, 31, 0.18);
 }
 
-.alert-view {
+.asset-view {
   display: none;
 }
 
-.alert-view.active {
+.asset-view.active {
   display: block;
 }
 
@@ -552,6 +560,57 @@ button:disabled {
   font-size: 0.88rem;
 }
 
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.modal-list {
+  margin-top: 12px;
+}
+
+.analysis-body {
+  display: grid;
+  gap: 14px;
+}
+
+.analysis-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(17, 43, 31, 0.05);
+}
+
+.analysis-hero h4 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.analysis-price {
+  font-size: 1.3rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.analysis-notes {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  display: grid;
+  gap: 8px;
+}
+
 .result-pill {
   display: inline-flex;
   align-items: center;
@@ -603,7 +662,8 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .sub-tabs {
+  .asset-tabs,
+  .analysis-grid {
     grid-template-columns: 1fr;
   }
 
@@ -624,6 +684,10 @@ button:disabled {
   .resource-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .analysis-hero {
+    flex-direction: column;
   }
 
   .scroll-area {
