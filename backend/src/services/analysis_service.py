@@ -1350,7 +1350,10 @@ class AnalysisService:
         average = mean(recent_non_zero) if recent_non_zero else 0
         if average <= 0:
             return None
-        return latest_non_zero / average
+        ratio = latest_non_zero / average
+        if ratio < 0.05:
+            return None
+        return ratio
 
     @staticmethod
     def _label_volume_signal(volume_ratio: Optional[float]) -> str:

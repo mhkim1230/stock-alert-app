@@ -114,7 +114,7 @@ class MarketContextService:
     async def _fetch_indicator_snapshot(self, symbol: str, label: str) -> Optional[Dict]:
         url = (
             "https://query1.finance.yahoo.com/v8/finance/chart/"
-            f"{symbol}?range=5d&interval=1d&includePrePost=false"
+            f"{symbol}?range=2d&interval=60m&includePrePost=false"
         )
         timeout = aiohttp.ClientTimeout(total=settings.request_timeout)
         try:
