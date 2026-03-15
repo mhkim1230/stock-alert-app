@@ -34,7 +34,6 @@ const elements = {
   installButton: document.getElementById("install-button"),
   settingsInstallButton: document.getElementById("settings-install-button"),
   summaryGrid: document.getElementById("summary-grid"),
-  heroStats: document.getElementById("hero-stats"),
   watchlistList: document.getElementById("watchlist-list"),
   fxWatchlistList: document.getElementById("fx-watchlist-list"),
   dashboardNotifications: document.getElementById("dashboard-notifications"),
@@ -223,15 +222,6 @@ function setView(name) {
   window.location.hash = nextView;
 }
 
-function getStockAlertCount(symbol) {
-  return state.stockAlerts.filter((item) => item.stock_symbol === symbol).length;
-}
-
-function getNewsAlertCount(symbol) {
-  const normalized = symbol.toLowerCase();
-  return state.newsAlerts.filter((item) => item.keywords.toLowerCase().includes(normalized)).length;
-}
-
 function getCurrencyAlertCount(base, target) {
   return state.currencyAlerts.filter(
     (item) => item.base_currency === base && item.target_currency === target
@@ -281,7 +271,6 @@ function renderStats() {
     )
     .join("");
   elements.summaryGrid.innerHTML = markup;
-  elements.heroStats.innerHTML = markup;
 }
 
 function renderStockWatchlist() {
@@ -293,18 +282,12 @@ function renderStockWatchlist() {
 
   elements.watchlistList.innerHTML = state.watchlist
     .map((item) => {
-      const stockAlerts = getStockAlertCount(item.symbol);
-      const newsAlerts = getNewsAlertCount(item.symbol);
       const market = state.stockQuotes[item.symbol]?.market || "";
       return `
         <li class="resource-item quote-item">
           <div class="resource-meta">
             <strong>${item.symbol}</strong>
             ${stockQuoteMarkup(item.symbol)}
-            <div class="pill-row">
-              <span class="result-pill">주식알림 ${stockAlerts}</span>
-              <span class="result-pill">뉴스알림 ${newsAlerts}</span>
-            </div>
           </div>
           <div class="resource-actions">
             <button class="ghost-button small" type="button" data-action="open-stock-analysis" data-symbol="${item.symbol}" data-market="${market}">상세분석</button>

@@ -98,7 +98,6 @@ a {
   gap: 18px;
 }
 
-.status-strip,
 .panel-card,
 .login-card {
   background: var(--surface);
@@ -108,15 +107,6 @@ a {
   backdrop-filter: blur(20px);
 }
 
-.status-strip {
-  display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-  gap: 16px;
-  padding: 14px 16px;
-  margin-bottom: 10px;
-}
-
-.hero-stats,
 .summary-grid {
   display: grid;
   gap: 12px;
@@ -302,22 +292,28 @@ button:disabled {
 }
 
 .quote-item {
-  align-items: center;
+  align-items: flex-start;
 }
 
 .resource-meta {
   display: grid;
   gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .resource-meta strong {
-  font-size: 1rem;
+  font-size: 0.98rem;
+  line-height: 1.35;
+  font-weight: 700;
 }
 
 .resource-meta small,
 .timeline-item small,
 .news-item small {
   color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 .danger-button {
@@ -689,7 +685,6 @@ button:disabled {
 }
 
 @media (max-width: 960px) {
-  .status-strip,
   .panel-grid,
   .dashboard-grid,
   .compact-grid,
