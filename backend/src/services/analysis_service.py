@@ -144,6 +144,7 @@ class AnalysisService:
     def _get_analysis_window(period: str) -> Dict[str, str]:
         normalized = (period or "short").lower()
         mapping = {
+            "intraday": {"range": "10d", "interval": "30m", "label": "30분 · 30분봉 기준 최근 10일"},
             "short": {"range": "6mo", "interval": "1d", "label": "단기 · 일봉 기준 최근 6개월"},
             "medium": {"range": "2y", "interval": "1wk", "label": "중기 · 주봉 기준 최근 2년"},
             "long": {"range": "5y", "interval": "1mo", "label": "장기 · 월봉 기준 최근 5년"},
@@ -154,6 +155,18 @@ class AnalysisService:
     def _get_strategy_profile(period: str) -> Dict[str, float]:
         normalized = (period or "short").lower()
         profiles = {
+            "intraday": {
+                "primary_span": 16,
+                "secondary_span": 48,
+                "buy_gap_1": 0.012,
+                "buy_gap_2": 0.028,
+                "sell_gap_1": 0.012,
+                "sell_gap_2": 0.028,
+                "stop_factor": 0.992,
+                "low_factor": 0.996,
+                "primary_label": "16봉",
+                "secondary_label": "48봉",
+            },
             "short": {
                 "primary_span": 20,
                 "secondary_span": 60,
