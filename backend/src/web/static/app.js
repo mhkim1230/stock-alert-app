@@ -1297,6 +1297,12 @@ async function handleListActions(event) {
 }
 
 function setupPwaInstall() {
+  const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
+  if (!isStandalone) {
+    elements.installButton.classList.remove("hidden");
+    elements.settingsInstallButton.classList.remove("hidden");
+  }
+
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     state.installPrompt = event;
@@ -1317,6 +1323,11 @@ function setupPwaInstall() {
 
   elements.installButton.addEventListener("click", promptInstall);
   elements.settingsInstallButton.addEventListener("click", promptInstall);
+
+  window.addEventListener("appinstalled", () => {
+    elements.installButton.classList.add("hidden");
+    elements.settingsInstallButton.classList.add("hidden");
+  });
 }
 
 function setupRouting() {

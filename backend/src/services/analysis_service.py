@@ -44,6 +44,7 @@ class AnalysisService:
             price_unit=price_unit,
             source=f"yahoo_chart:{yahoo_symbol}",
             timeframe=analysis_window["label"],
+            period=period,
             investor_flow=investor_flow,
             news_context=news_context,
         )
@@ -71,6 +72,7 @@ class AnalysisService:
             price_unit=target.upper(),
             source=f"yahoo_chart:{pair}",
             timeframe=analysis_window["label"],
+            period=period,
             investor_flow=None,
             news_context=news_context,
         )
@@ -148,6 +150,49 @@ class AnalysisService:
         }
         return mapping.get(normalized, mapping["short"])
 
+    @staticmethod
+    def _get_strategy_profile(period: str) -> Dict[str, float]:
+        normalized = (period or "short").lower()
+        profiles = {
+            "short": {
+                "primary_span": 20,
+                "secondary_span": 60,
+                "buy_gap_1": 0.03,
+                "buy_gap_2": 0.08,
+                "sell_gap_1": 0.03,
+                "sell_gap_2": 0.08,
+                "stop_factor": 0.98,
+                "low_factor": 0.99,
+                "primary_label": "20봉",
+                "secondary_label": "60봉",
+            },
+            "medium": {
+                "primary_span": 13,
+                "secondary_span": 26,
+                "buy_gap_1": 0.06,
+                "buy_gap_2": 0.14,
+                "sell_gap_1": 0.06,
+                "sell_gap_2": 0.14,
+                "stop_factor": 0.965,
+                "low_factor": 0.985,
+                "primary_label": "13주",
+                "secondary_label": "26주",
+            },
+            "long": {
+                "primary_span": 12,
+                "secondary_span": 36,
+                "buy_gap_1": 0.1,
+                "buy_gap_2": 0.22,
+                "sell_gap_1": 0.1,
+                "sell_gap_2": 0.22,
+                "stop_factor": 0.94,
+                "low_factor": 0.975,
+                "primary_label": "12개월",
+                "secondary_label": "36개월",
+            },
+        }
+        return profiles.get(normalized, profiles["short"])
+
     async def _fetch_investor_flow(self, symbol: str) -> Optional[Dict]:
         url = f"https://finance.naver.com/item/main.naver?code={symbol}"
         timeout = aiohttp.ClientTimeout(total=settings.request_timeout)
@@ -216,7 +261,6 @@ class AnalysisService:
             return None
 
         recent = history[-20:]
-        closes = [item["close"] for item in recent]
         volumes = [item.get("volume", 0.0) for item in recent]
 
         signed_notional = 0.0
@@ -325,6 +369,7 @@ class AnalysisService:
         price_unit: str,
         source: str,
         timeframe: str,
+        period: str,
         investor_flow: Optional[Dict],
         news_context: Dict,
     ) -> Dict:
@@ -332,14 +377,17 @@ class AnalysisService:
         highs = [item["high"] for item in history]
         lows = [item["low"] for item in history]
         volumes = [item.get("volume", 0.0) for item in history]
+        profile = self._get_strategy_profile(period)
 
         current = closes[-1]
-        sma20 = mean(closes[-20:]) if len(closes) >= 20 else mean(closes)
-        sma60 = mean(closes[-60:]) if len(closes) >= 60 else mean(closes)
-        low20 = min(lows[-20:]) if len(lows) >= 20 else min(lows)
-        low60 = min(lows[-60:]) if len(lows) >= 60 else min(lows)
-        high20 = max(highs[-20:]) if len(highs) >= 20 else max(highs)
-        high60 = max(highs[-60:]) if len(highs) >= 60 else max(highs)
+        primary_span = min(profile["primary_span"], len(closes))
+        secondary_span = min(profile["secondary_span"], len(closes))
+        sma20 = mean(closes[-primary_span:]) if len(closes) >= primary_span else mean(closes)
+        sma60 = mean(closes[-secondary_span:]) if len(closes) >= secondary_span else mean(closes)
+        low20 = min(lows[-primary_span:]) if len(lows) >= primary_span else min(lows)
+        low60 = min(lows[-secondary_span:]) if len(lows) >= secondary_span else min(lows)
+        high20 = max(highs[-primary_span:]) if len(highs) >= primary_span else max(highs)
+        high60 = max(highs[-secondary_span:]) if len(highs) >= secondary_span else max(highs)
         rsi14 = self._calculate_rsi(closes, 14)
         macd_line, macd_signal, macd_hist = self._calculate_macd(closes)
         atr14 = self._calculate_atr(history, 14)
@@ -364,8 +412,8 @@ class AnalysisService:
                     low60,
                     sma20,
                     sma60,
-                    current * 0.97,
-                    current * 0.92,
+                    current * (1 - profile["buy_gap_1"]),
+                    current * (1 - profile["buy_gap_2"]),
                 )
                 if value < current
             },
@@ -377,18 +425,18 @@ class AnalysisService:
                 for value in (
                     high20,
                     high60,
-                    current * 1.03,
-                    current * 1.08,
+                    current * (1 + profile["sell_gap_1"]),
+                    current * (1 + profile["sell_gap_2"]),
                 )
                 if value > current
             }
         )
 
-        first_buy = supports[0] if supports else current * 0.97
-        second_buy = supports[1] if len(supports) > 1 else current * 0.92
-        first_sell = resistances[0] if resistances else current * 1.03
-        second_sell = resistances[1] if len(resistances) > 1 else current * 1.08
-        stop_loss = min(second_buy * 0.98, low60 * 0.99)
+        first_buy = supports[0] if supports else current * (1 - profile["buy_gap_1"])
+        second_buy = supports[1] if len(supports) > 1 else current * (1 - profile["buy_gap_2"])
+        first_sell = resistances[0] if resistances else current * (1 + profile["sell_gap_1"])
+        second_sell = resistances[1] if len(resistances) > 1 else current * (1 + profile["sell_gap_2"])
+        stop_loss = max(second_buy * profile["stop_factor"], low60 * profile["low_factor"])
 
         confidence_score = self._calculate_confidence(
             current=current,
@@ -407,8 +455,8 @@ class AnalysisService:
         confidence_label = self._label_confidence(confidence_score)
 
         notes = [
-            f"20일 평균 {self._fmt(sma20, price_unit, asset_type)}, 60일 평균 {self._fmt(sma60, price_unit, asset_type)} 기준입니다.",
-            f"최근 20일 고점/저점은 {self._fmt(high20, price_unit, asset_type)} / {self._fmt(low20, price_unit, asset_type)} 입니다.",
+            f"{profile['primary_label']} 평균 {self._fmt(sma20, price_unit, asset_type)}, {profile['secondary_label']} 평균 {self._fmt(sma60, price_unit, asset_type)} 기준입니다.",
+            f"최근 {profile['primary_label']} 고점/저점은 {self._fmt(high20, price_unit, asset_type)} / {self._fmt(low20, price_unit, asset_type)} 입니다.",
             f"1차 매수는 현재가 아래의 가까운 지지선, 2차 매수는 중기 지지선 기준입니다.",
             f"1차 매도는 단기 저항, 2차 매도는 최근 중기 고점 기준입니다.",
             f"거래량 신호는 최근 20일 평균 대비 비율({volume_ratio:.2f}배)로 계산합니다." if volume_ratio is not None else "거래량 데이터는 현재 분석에 반영되지 않았습니다.",
