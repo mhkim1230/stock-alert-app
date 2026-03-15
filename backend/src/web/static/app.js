@@ -1046,6 +1046,15 @@ async function handleFxLookupWithPair(base, target) {
 async function handleFxSelectionChange() {
   const base = String(elements.fxBaseSelect.value).toUpperCase();
   const target = String(elements.fxTargetSelect.value).toUpperCase();
+  if (
+    state.currentFxResult &&
+    state.lastFxLookup.base === base &&
+    state.lastFxLookup.target === target &&
+    state.currentFxResult.base_currency === base &&
+    state.currentFxResult.target_currency === target
+  ) {
+    return;
+  }
   await handleFxLookupWithPair(base, target);
 }
 
@@ -1487,6 +1496,10 @@ elements.analysisRangeSwitch.addEventListener("click", async (event) => {
 });
 elements.fxBaseSelect.addEventListener("change", handleFxSelectionChange);
 elements.fxTargetSelect.addEventListener("change", handleFxSelectionChange);
+elements.fxBaseSelect.addEventListener("input", handleFxSelectionChange);
+elements.fxTargetSelect.addEventListener("input", handleFxSelectionChange);
+elements.fxBaseSelect.addEventListener("blur", handleFxSelectionChange);
+elements.fxTargetSelect.addEventListener("blur", handleFxSelectionChange);
 elements.loginForm.addEventListener("submit", handleLogin);
 elements.logoutButton.addEventListener("click", handleLogout);
 elements.refreshDashboard.addEventListener("click", async () => {
