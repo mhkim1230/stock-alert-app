@@ -386,12 +386,13 @@ button:disabled {
   overflow: hidden;
   border-radius: 18px;
   --swipe-offset: 0px;
+  --swipe-open-width: 168px;
 }
 
 .swipe-actions {
   position: absolute;
   inset: 0 0 0 auto;
-  width: 168px;
+  width: var(--swipe-open-width);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 5px;
@@ -419,7 +420,7 @@ button:disabled {
 }
 
 .swipe-card.open .swipe-surface {
-  transform: translateX(-168px);
+  transform: translateX(calc(-1 * var(--swipe-open-width)));
 }
 
 .swipe-card.dragging .swipe-surface {
@@ -428,6 +429,11 @@ button:disabled {
 
 .swipe-item-content {
   min-height: 100%;
+  transition: padding 180ms ease;
+}
+
+.swipe-card.open .swipe-item-content {
+  padding-left: var(--swipe-open-width);
 }
 
 .quote-item {
@@ -909,8 +915,8 @@ button:disabled {
     width: 156px;
   }
 
-  #fx-result .swipe-card.open .swipe-surface {
-    transform: translateX(-156px);
+  #fx-result .swipe-card {
+    --swipe-open-width: 156px;
   }
 
   .resource-item {
