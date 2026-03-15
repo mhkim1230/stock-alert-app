@@ -61,6 +61,14 @@ class WatchlistItem(Base, TimestampMixin):
     symbol: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
 
 
+class FxWatchlistItem(Base, TimestampMixin):
+    __tablename__ = "fx_watchlist_items"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    base_currency: Mapped[str] = mapped_column(String(3), nullable=False, index=True)
+    target_currency: Mapped[str] = mapped_column(String(3), nullable=False, index=True)
+
+
 class StockAlert(Base, TimestampMixin):
     __tablename__ = "stock_alerts"
 

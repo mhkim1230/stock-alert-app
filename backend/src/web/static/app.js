@@ -3,7 +3,7 @@ const FX_WATCHLIST_KEY = "stock-alert-fx-watchlist-v1";
 const state = {
   watchlist: [],
   stockQuotes: {},
-  fxWatchlist: loadFxWatchlist(),
+  fxWatchlist: [],
   fxRates: {},
   stockAlerts: [],
   currencyAlerts: [],
@@ -58,31 +58,6 @@ const elements = {
   analysisModal: document.getElementById("analysis-modal"),
   analysisBody: document.getElementById("analysis-body"),
 };
-
-function loadFxWatchlist() {
-  try {
-    const raw = localStorage.getItem(FX_WATCHLIST_KEY);
-    if (!raw) {
-      return [{ base: "USD", target: "KRW" }];
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed
-      .map((item) => ({
-        base: String(item.base || "").toUpperCase(),
-        target: String(item.target || "").toUpperCase(),
-      }))
-      .filter((item) => item.base.length === 3 && item.target.length === 3);
-  } catch {
-    return [{ base: "USD", target: "KRW" }];
-  }
-}
-
-function saveFxWatchlist() {
-  localStorage.setItem(FX_WATCHLIST_KEY, JSON.stringify(state.fxWatchlist));
-}
 
 async function request(path, options = {}) {
   const { loadingMessage = "불러오는 중입니다...", skipLoading = false, ...fetchOptions } = options;
@@ -489,6 +464,42 @@ function renderAnalysis(data) {
   `;
 }
 
+async function migrateLegacyFxWatchlist() {
+  try {
+    const raw = localStorage.getItem(FX_WATCHLIST_KEY);
+    if (!raw) {
+      return;
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.length) {
+      localStorage.removeItem(FX_WATCHLIST_KEY);
+      return;
+    }
+
+    for (const item of parsed) {
+      const base = String(item.base || "").toUpperCase();
+      const target = String(item.target || "").toUpperCase();
+      if (base.length !== 3 || target.length !== 3) {
+        continue;
+      }
+      try {
+        await request("/watchlist/fx", {
+          method: "POST",
+          body: JSON.stringify({ base_currency: base, target_currency: target }),
+          skipLoading: true,
+        });
+      } catch (error) {
+        if (!String(error.message).includes("already exists")) {
+          throw error;
+        }
+      }
+    }
+    localStorage.removeItem(FX_WATCHLIST_KEY);
+  } catch {
+    // Ignore legacy migration issues and continue with DB-backed state.
+  }
+}
+
 function renderAll() {
   renderStats();
   renderStockWatchlist();
@@ -537,8 +548,9 @@ async function refreshFxRates() {
 }
 
 async function refreshData() {
-  const [watchlist, stockAlerts, currencyAlerts, newsAlerts, notifications, unread] = await Promise.all([
+  const [watchlist, fxWatchlist, stockAlerts, currencyAlerts, newsAlerts, notifications, unread] = await Promise.all([
     request("/watchlist", { loadingMessage: "관심종목을 불러오는 중입니다..." }),
+    request("/watchlist/fx", { loadingMessage: "관심환율을 불러오는 중입니다..." }),
     request("/alerts/stocks", { loadingMessage: "주식 알림을 불러오는 중입니다..." }),
     request("/alerts/currencies", { loadingMessage: "환율 알림을 불러오는 중입니다..." }),
     request("/alerts/news", { loadingMessage: "뉴스 알림을 불러오는 중입니다..." }),
@@ -547,6 +559,11 @@ async function refreshData() {
   ]);
 
   state.watchlist = watchlist;
+  state.fxWatchlist = fxWatchlist.map((item) => ({
+    id: item.id,
+    base: item.base_currency,
+    target: item.target_currency,
+  }));
   state.stockAlerts = stockAlerts;
   state.currencyAlerts = currencyAlerts;
   state.newsAlerts = newsAlerts;
@@ -576,6 +593,7 @@ function showLoggedOut() {
 async function bootstrap() {
   try {
     await request("/session/me", { loadingMessage: "세션을 확인하는 중입니다..." });
+    await migrateLegacyFxWatchlist();
     showLoggedIn();
     await refreshData();
   } catch {
@@ -788,12 +806,20 @@ async function handleFxWatchlistSubmit(event) {
     return;
   }
 
-  state.fxWatchlist.unshift({ base, target });
-  saveFxWatchlist();
-  form.reset();
-  await refreshFxRates();
-  renderAll();
-  showToast("관심환율을 저장했습니다.", "success");
+  try {
+    await withFormBusy(form, "저장 중...", async () => {
+      await request("/watchlist/fx", {
+        method: "POST",
+        body: JSON.stringify({ base_currency: base, target_currency: target }),
+        loadingMessage: "관심환율을 저장하는 중입니다...",
+      });
+    });
+    form.reset();
+    await refreshData();
+    showToast("관심환율을 저장했습니다.", "success");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
 }
 
 async function handleQuickStockAlertSubmit(event) {
@@ -947,10 +973,12 @@ async function handleListActions(event) {
       const { base, target } = state.lastFxLookup;
       const exists = state.fxWatchlist.some((item) => item.base === base && item.target === target);
       if (!exists) {
-        state.fxWatchlist.unshift({ base, target });
-        saveFxWatchlist();
-        await refreshFxRates();
-        renderAll();
+        await request("/watchlist/fx", {
+          method: "POST",
+          body: JSON.stringify({ base_currency: base, target_currency: target }),
+          loadingMessage: "현재 환율 페어를 저장하는 중입니다...",
+        });
+        await refreshData();
       }
       setView("watchlist");
       setAssetView("fx");
@@ -1012,12 +1040,16 @@ async function handleListActions(event) {
       return;
     }
     if (action === "delete-fx-watchlist") {
-      state.fxWatchlist = state.fxWatchlist.filter(
-        (item) => !(item.base === trigger.dataset.base && item.target === trigger.dataset.target)
-      );
-      saveFxWatchlist();
-      await refreshFxRates();
-      renderAll();
+      await withButtonBusy(trigger, "삭제 중...", async () => {
+        await request(
+          `/watchlist/fx/${encodeURIComponent(trigger.dataset.base)}/${encodeURIComponent(trigger.dataset.target)}`,
+          {
+            method: "DELETE",
+            loadingMessage: "관심환율을 삭제하는 중입니다...",
+          }
+        );
+      });
+      await refreshData();
       showToast("관심환율을 삭제했습니다.", "info");
       return;
     }

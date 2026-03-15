@@ -5,8 +5,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_protected_db
-from src.models.database import WatchlistItem
-from src.schemas.api import WatchlistItemCreate, WatchlistItemResponse
+from src.models.database import FxWatchlistItem, WatchlistItem
+from src.schemas.api import (
+    FxWatchlistItemCreate,
+    FxWatchlistItemResponse,
+    WatchlistItemCreate,
+    WatchlistItemResponse,
+)
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 
@@ -14,6 +19,21 @@ router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 @router.get("", response_model=List[WatchlistItemResponse])
 async def list_watchlist(db: AsyncSession = Depends(get_protected_db)):
     items = list((await db.execute(select(WatchlistItem).order_by(WatchlistItem.symbol.asc()))).scalars())
+    return items
+
+
+@router.get("/fx", response_model=List[FxWatchlistItemResponse])
+async def list_fx_watchlist(db: AsyncSession = Depends(get_protected_db)):
+    items = list(
+        (
+            await db.execute(
+                select(FxWatchlistItem).order_by(
+                    FxWatchlistItem.base_currency.asc(),
+                    FxWatchlistItem.target_currency.asc(),
+                )
+            )
+        ).scalars()
+    )
     return items
 
 
@@ -28,6 +48,48 @@ async def create_watchlist_item(payload: WatchlistItemCreate, db: AsyncSession =
     await db.commit()
     await db.refresh(item)
     return item
+
+
+@router.post("/fx", response_model=FxWatchlistItemResponse, status_code=status.HTTP_201_CREATED)
+async def create_fx_watchlist_item(
+    payload: FxWatchlistItemCreate, db: AsyncSession = Depends(get_protected_db)
+):
+    base_currency = payload.base_currency.upper()
+    target_currency = payload.target_currency.upper()
+    existing = (
+        await db.execute(
+            select(FxWatchlistItem).where(
+                FxWatchlistItem.base_currency == base_currency,
+                FxWatchlistItem.target_currency == target_currency,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="Currency pair already exists in watchlist")
+
+    item = FxWatchlistItem(base_currency=base_currency, target_currency=target_currency)
+    db.add(item)
+    await db.commit()
+    await db.refresh(item)
+    return item
+
+
+@router.delete("/fx/{base_currency}/{target_currency}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_fx_watchlist_item(
+    base_currency: str, target_currency: str, db: AsyncSession = Depends(get_protected_db)
+):
+    item = (
+        await db.execute(
+            select(FxWatchlistItem).where(
+                FxWatchlistItem.base_currency == base_currency.upper(),
+                FxWatchlistItem.target_currency == target_currency.upper(),
+            )
+        )
+    ).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="FX watchlist pair not found")
+    await db.delete(item)
+    await db.commit()
 
 
 @router.delete("/{symbol}", status_code=status.HTTP_204_NO_CONTENT)

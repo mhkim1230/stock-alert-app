@@ -50,6 +50,22 @@ class WatchlistItemResponse(BaseModel):
         orm_mode = True
 
 
+class FxWatchlistItemCreate(BaseModel):
+    base_currency: str = Field(..., min_length=3, max_length=3)
+    target_currency: str = Field(..., min_length=3, max_length=3)
+
+
+class FxWatchlistItemResponse(BaseModel):
+    id: str
+    base_currency: str
+    target_currency: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
 class StockAlertCreate(BaseModel):
     stock_symbol: str = Field(..., min_length=1, max_length=20)
     target_price: float = Field(..., gt=0)
