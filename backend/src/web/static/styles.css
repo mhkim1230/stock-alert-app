@@ -603,12 +603,37 @@ button:disabled {
   gap: 10px;
 }
 
+.compact-analysis-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.analysis-section {
+  display: grid;
+  gap: 10px;
+}
+
+.analysis-section h5 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
 .analysis-notes {
   margin: 0;
   padding-left: 18px;
   color: var(--muted);
   display: grid;
   gap: 8px;
+}
+
+.analysis-headlines {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.muted-list {
+  color: var(--muted);
 }
 
 .result-pill {
@@ -663,7 +688,8 @@ button:disabled {
   }
 
   .asset-tabs,
-  .analysis-grid {
+  .analysis-grid,
+  .compact-analysis-grid {
     grid-template-columns: 1fr;
   }
 

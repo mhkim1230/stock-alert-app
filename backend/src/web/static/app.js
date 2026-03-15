@@ -441,6 +441,44 @@ function renderSelectedCurrencyAlerts() {
 
 function renderAnalysis(data) {
   const formatter = data.asset_type === "currency" ? formatRate : formatPrice;
+  const indicatorRows = [
+    { label: "거래량 신호", value: data.volume_signal || "데이터 없음" },
+    { label: "거래량 비율", value: data.volume_ratio ? `${data.volume_ratio.toFixed(2)}배` : "-" },
+    { label: "RSI(14)", value: data.rsi14 ?? "-" },
+    { label: "MACD", value: data.macd ?? "-" },
+    { label: "MACD Signal", value: data.macd_signal ?? "-" },
+    { label: "ATR(14)", value: data.atr14 ?? "-" },
+  ];
+
+  const investorMarkup = data.investor_flow
+    ? `
+      <div class="analysis-section">
+        <h5>수급 흐름</h5>
+        <div class="analysis-grid compact-analysis-grid">
+          <div class="stat-card"><small>외국인 5일</small><strong>${data.investor_flow.foreign_direction} ${Number(data.investor_flow.foreign_5d).toLocaleString("ko-KR")}</strong></div>
+          <div class="stat-card"><small>기관 5일</small><strong>${data.investor_flow.institution_direction} ${Number(data.investor_flow.institution_5d).toLocaleString("ko-KR")}</strong></div>
+        </div>
+      </div>
+    `
+    : `
+      <div class="analysis-section">
+        <h5>수급 흐름</h5>
+        <div class="callout">기관/외국인 수급 데이터는 현재 국내 주식에만 반영됩니다.</div>
+      </div>
+    `;
+
+  const newsMarkup = `
+    <div class="analysis-section">
+      <h5>뉴스/국제정세 영향</h5>
+      <div class="callout">${data.market_context || "현재 반영할 뉴스 요약이 없습니다."}</div>
+      <div class="pill-row">
+        <span class="result-pill">뉴스 영향 ${data.news_bias || "중립"}</span>
+      </div>
+      ${(data.related_headlines || []).length ? `<ul class="analysis-headlines">${data.related_headlines.map((headline) => `<li>${headline}</li>`).join("")}</ul>` : ""}
+      ${(data.macro_headlines || []).length ? `<ul class="analysis-headlines muted-list">${data.macro_headlines.map((headline) => `<li>${headline}</li>`).join("")}</ul>` : ""}
+    </div>
+  `;
+
   elements.analysisBody.innerHTML = `
     <div class="analysis-hero">
       <div>
@@ -459,6 +497,14 @@ function renderAnalysis(data) {
       <div class="stat-card"><small>손절 기준</small><strong>${formatter(data.stop_loss, data.price_unit)}</strong></div>
       <div class="stat-card"><small>데이터 소스</small><strong>${data.source}</strong></div>
     </div>
+    <div class="analysis-section">
+      <h5>기술 지표</h5>
+      <div class="analysis-grid compact-analysis-grid">
+        ${indicatorRows.map((item) => `<div class="stat-card"><small>${item.label}</small><strong>${item.value}</strong></div>`).join("")}
+      </div>
+    </div>
+    ${investorMarkup}
+    ${newsMarkup}
     <ul class="analysis-notes">
       ${data.notes.map((note) => `<li>${note}</li>`).join("")}
     </ul>
