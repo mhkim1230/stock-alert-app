@@ -169,11 +169,23 @@ class AnalysisService:
         second_sell = resistances[1] if len(resistances) > 1 else current * 1.08
         stop_loss = min(second_buy * 0.98, low60 * 0.99)
 
+        confidence_score = self._calculate_confidence(
+            current=current,
+            sma20=sma20,
+            sma60=sma60,
+            low20=low20,
+            high20=high20,
+            supports=supports,
+            resistances=resistances,
+        )
+        confidence_label = self._label_confidence(confidence_score)
+
         notes = [
             f"20일 평균 {self._fmt(sma20, price_unit, asset_type)}, 60일 평균 {self._fmt(sma60, price_unit, asset_type)} 기준입니다.",
             f"최근 20일 고점/저점은 {self._fmt(high20, price_unit, asset_type)} / {self._fmt(low20, price_unit, asset_type)} 입니다.",
             f"1차 매수는 현재가 아래의 가까운 지지선, 2차 매수는 중기 지지선 기준입니다.",
             f"1차 매도는 단기 저항, 2차 매도는 최근 중기 고점 기준입니다.",
+            "이 신뢰도는 가격 구조 일치도를 수치화한 값이며, 실제 수익률 정확도를 보장하지는 않습니다.",
         ]
 
         return {
@@ -189,6 +201,8 @@ class AnalysisService:
             "first_sell": round(first_sell, 4),
             "second_sell": round(second_sell, 4),
             "stop_loss": round(stop_loss, 4),
+            "confidence_score": confidence_score,
+            "confidence_label": confidence_label,
             "timeframe": timeframe,
             "source": source,
             "notes": notes,
@@ -203,3 +217,50 @@ class AnalysisService:
         if unit == "USD":
             return f"{value:,.2f} USD"
         return f"{value:,.4f} {unit}"
+
+    @staticmethod
+    def _calculate_confidence(
+        current: float,
+        sma20: float,
+        sma60: float,
+        low20: float,
+        high20: float,
+        supports: List[float],
+        resistances: List[float],
+    ) -> int:
+        score = 50
+
+        if current >= sma20 >= sma60 or current <= sma20 <= sma60:
+            score += 18
+        elif abs(sma20 - sma60) / current <= 0.01:
+            score -= 8
+
+        if supports:
+            nearest_support_gap = abs(current - supports[0]) / current
+            if nearest_support_gap <= 0.03:
+                score += 10
+            elif nearest_support_gap >= 0.08:
+                score -= 6
+
+        if resistances:
+            nearest_resistance_gap = abs(resistances[0] - current) / current
+            if nearest_resistance_gap <= 0.03:
+                score += 10
+            elif nearest_resistance_gap >= 0.08:
+                score -= 6
+
+        range_ratio = (high20 - low20) / current if current else 0
+        if range_ratio <= 0.08:
+            score += 8
+        elif range_ratio >= 0.2:
+            score -= 10
+
+        return max(35, min(88, int(round(score))))
+
+    @staticmethod
+    def _label_confidence(score: int) -> str:
+        if score >= 75:
+            return "높음"
+        if score >= 60:
+            return "보통"
+        return "낮음"

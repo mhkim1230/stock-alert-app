@@ -182,6 +182,8 @@ class TechnicalAnalysisResponse(BaseModel):
     first_sell: float
     second_sell: float
     stop_loss: float
+    confidence_score: int
+    confidence_label: str
     timeframe: str
     source: str
     notes: List[str]

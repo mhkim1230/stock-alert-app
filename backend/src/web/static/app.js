@@ -451,6 +451,7 @@ function renderAnalysis(data) {
       <div class="analysis-price">${formatter(data.current_price, data.price_unit)}</div>
     </div>
     <div class="analysis-grid">
+      <div class="stat-card"><small>분석 신뢰도</small><strong>${data.confidence_score}점 · ${data.confidence_label}</strong></div>
       <div class="stat-card"><small>1차 매수가</small><strong>${formatter(data.first_buy, data.price_unit)}</strong></div>
       <div class="stat-card"><small>2차 매수가</small><strong>${formatter(data.second_buy, data.price_unit)}</strong></div>
       <div class="stat-card"><small>1차 매도가</small><strong>${formatter(data.first_sell, data.price_unit)}</strong></div>
