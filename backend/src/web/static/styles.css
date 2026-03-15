@@ -433,7 +433,7 @@ button:disabled {
 }
 
 .swipe-card.open .swipe-item-content {
-  padding-left: var(--swipe-open-width);
+  padding: 12px 12px 12px calc(var(--swipe-open-width) + 12px);
 }
 
 .quote-item {
@@ -917,6 +917,10 @@ button:disabled {
 
   #fx-result .swipe-card {
     --swipe-open-width: 156px;
+  }
+
+  #fx-result .swipe-card.open .swipe-item-content {
+    padding: 10px 12px 10px calc(var(--swipe-open-width) + 12px);
   }
 
   .resource-item {
