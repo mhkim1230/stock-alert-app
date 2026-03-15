@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from statistics import mean
 from typing import Dict, List, Optional, Tuple
@@ -69,10 +70,15 @@ class MarketContextService:
         if name and name.lower() != symbol.lower():
             queries.append(name)
 
+        related_results = await asyncio.gather(
+            *(self.news_service.get_latest_news(query=query, limit=4) for query in queries[:2]),
+            return_exceptions=True,
+        )
         related_articles: List[Dict[str, str]] = []
         seen_titles = set()
-        for query in queries[:2]:
-            articles = await self.news_service.get_latest_news(query=query, limit=4)
+        for articles in related_results:
+            if isinstance(articles, Exception):
+                continue
             for article in articles:
                 title = article.get("title", "")
                 if title in seen_titles:
@@ -80,21 +86,30 @@ class MarketContextService:
                 seen_titles.add(title)
                 related_articles.append(article)
 
-        macro_articles = await self.news_service.get_latest_news(limit=10)
-        indicators = await self._fetch_market_indicators()
+        macro_articles, indicators = await asyncio.gather(
+            self.news_service.get_latest_news(limit=10),
+            self._fetch_market_indicators(),
+        )
         return related_articles[:4], macro_articles[:10], indicators
 
     async def _fetch_market_indicators(self) -> Dict[str, Dict]:
+        tasks = {
+            key: asyncio.create_task(self._fetch_indicator_with_fallback(config["candidates"], config["label"]))
+            for key, config in self.MARKET_SYMBOLS.items()
+        }
         results: Dict[str, Dict] = {}
-        for key, config in self.MARKET_SYMBOLS.items():
-            payload = None
-            for candidate in config["candidates"]:
-                payload = await self._fetch_indicator_snapshot(candidate, config["label"])
-                if payload:
-                    break
+        for key, task in tasks.items():
+            payload = await task
             if payload:
                 results[key] = payload
         return results
+
+    async def _fetch_indicator_with_fallback(self, candidates: List[str], label: str) -> Optional[Dict]:
+        for candidate in candidates:
+            payload = await self._fetch_indicator_snapshot(candidate, label)
+            if payload:
+                return payload
+        return None
 
     async def _fetch_indicator_snapshot(self, symbol: str, label: str) -> Optional[Dict]:
         url = (

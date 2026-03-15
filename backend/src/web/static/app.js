@@ -917,7 +917,7 @@ async function openStockAnalysis(symbol, market = "") {
     assetType: "stock",
     symbol,
     market,
-    period: state.analysisContext?.assetType === "stock" && state.analysisContext?.symbol === symbol ? state.analysisContext.period : "intraday",
+    period: state.analysisContext?.assetType === "stock" && state.analysisContext?.symbol === symbol ? state.analysisContext.period : "short",
   };
   openAnalysisModal();
   await loadCurrentAnalysis();
@@ -928,7 +928,7 @@ async function openFxAnalysis(base, target) {
     assetType: "currency",
     base,
     target,
-    period: state.analysisContext?.assetType === "currency" && state.analysisContext?.base === base && state.analysisContext?.target === target ? state.analysisContext.period : "intraday",
+    period: state.analysisContext?.assetType === "currency" && state.analysisContext?.base === base && state.analysisContext?.target === target ? state.analysisContext.period : "short",
   };
   openAnalysisModal();
   await loadCurrentAnalysis();
@@ -965,10 +965,12 @@ async function loadCurrentAnalysis() {
       const qs = market ? `?market=${encodeURIComponent(market)}` : "";
       payload = await request(`/analysis/stocks/${encodeURIComponent(symbol)}/${period}${qs}`, {
         loadingMessage: `${basisLabel} 기준 주식 상세분석을 준비하는 중입니다...`,
+        skipLoading: true,
       });
     } else {
       payload = await request(`/analysis/currencies/${encodeURIComponent(base)}/${encodeURIComponent(target)}/${period}`, {
         loadingMessage: `${basisLabel} 기준 환율 상세분석을 준비하는 중입니다...`,
+        skipLoading: true,
       });
     }
     renderAnalysis(payload);

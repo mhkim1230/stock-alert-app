@@ -576,6 +576,7 @@ button:disabled {
   padding: calc(env(safe-area-inset-top) + 8px) 16px 8px;
   background: rgba(244, 247, 251, 0.96);
   backdrop-filter: blur(14px);
+  pointer-events: none;
 }
 
 .loading-bar {

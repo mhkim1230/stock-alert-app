@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from statistics import mean, pstdev
 from typing import Dict, List, Optional, Tuple
@@ -1342,11 +1343,14 @@ class AnalysisService:
     def _calculate_volume_ratio(volumes: List[float], period: int) -> Optional[float]:
         if len(volumes) <= period:
             return None
-        latest = volumes[-1]
-        average = mean(volumes[-period:])
+        latest_non_zero = next((value for value in reversed(volumes) if value and value > 0), None)
+        if latest_non_zero is None:
+            return None
+        recent_non_zero = [value for value in volumes[-period:] if value and value > 0]
+        average = mean(recent_non_zero) if recent_non_zero else 0
         if average <= 0:
             return None
-        return latest / average
+        return latest_non_zero / average
 
     @staticmethod
     def _label_volume_signal(volume_ratio: Optional[float]) -> str:
