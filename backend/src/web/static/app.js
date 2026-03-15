@@ -239,14 +239,15 @@ async function bootstrap() {
 async function handleLogin(event) {
   event.preventDefault();
   elements.loginError.classList.add("hidden");
-  const formData = new FormData(event.currentTarget);
+  const form = event.currentTarget;
+  const formData = new FormData(form);
 
   try {
     await request("/session/login", {
       method: "POST",
       body: JSON.stringify({ password: formData.get("password") }),
     });
-    event.currentTarget.reset();
+    form.reset();
     showLoggedIn();
     await refreshData();
     showToast("로그인되었습니다.", "success");
@@ -264,19 +265,21 @@ async function handleLogout() {
 
 async function handleWatchlistSubmit(event) {
   event.preventDefault();
-  const formData = new FormData(event.currentTarget);
+  const form = event.currentTarget;
+  const formData = new FormData(form);
   await request("/watchlist", {
     method: "POST",
     body: JSON.stringify({ symbol: formData.get("symbol") }),
   });
-  event.currentTarget.reset();
+  form.reset();
   await refreshData();
   showToast("관심종목을 추가했습니다.", "success");
 }
 
 async function handleStockAlertSubmit(event) {
   event.preventDefault();
-  const formData = new FormData(event.currentTarget);
+  const form = event.currentTarget;
+  const formData = new FormData(form);
   await request("/alerts/stocks", {
     method: "POST",
     body: JSON.stringify({
@@ -285,14 +288,15 @@ async function handleStockAlertSubmit(event) {
       condition: formData.get("condition"),
     }),
   });
-  event.currentTarget.reset();
+  form.reset();
   await refreshData();
   showToast("주식 알림을 추가했습니다.", "success");
 }
 
 async function handleCurrencyAlertSubmit(event) {
   event.preventDefault();
-  const formData = new FormData(event.currentTarget);
+  const form = event.currentTarget;
+  const formData = new FormData(form);
   await request("/alerts/currencies", {
     method: "POST",
     body: JSON.stringify({
@@ -302,26 +306,28 @@ async function handleCurrencyAlertSubmit(event) {
       condition: formData.get("condition"),
     }),
   });
-  event.currentTarget.reset();
+  form.reset();
   await refreshData();
   showToast("환율 알림을 추가했습니다.", "success");
 }
 
 async function handleNewsAlertSubmit(event) {
   event.preventDefault();
-  const formData = new FormData(event.currentTarget);
+  const form = event.currentTarget;
+  const formData = new FormData(form);
   await request("/alerts/news", {
     method: "POST",
     body: JSON.stringify({ keywords: formData.get("keywords") }),
   });
-  event.currentTarget.reset();
+  form.reset();
   await refreshData();
   showToast("뉴스 알림을 추가했습니다.", "success");
 }
 
 async function handleStockSearch(event) {
   event.preventDefault();
-  const formData = new FormData(event.currentTarget);
+  const form = event.currentTarget;
+  const formData = new FormData(form);
   const query = formData.get("query");
   const payload = await request(`/stocks/search?query=${encodeURIComponent(query)}`);
   const results = payload.results || [];
@@ -347,7 +353,8 @@ async function handleStockSearch(event) {
 
 async function handleFxLookup(event) {
   event.preventDefault();
-  const formData = new FormData(event.currentTarget);
+  const form = event.currentTarget;
+  const formData = new FormData(form);
   const base = String(formData.get("base")).toUpperCase();
   const target = String(formData.get("target")).toUpperCase();
   const payload = await request(`/currency/rate?base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`);
@@ -361,7 +368,8 @@ async function handleFxLookup(event) {
 
 async function handleNewsSearch(event) {
   event.preventDefault();
-  const formData = new FormData(event.currentTarget);
+  const form = event.currentTarget;
+  const formData = new FormData(form);
   const query = formData.get("query");
   const qs = query ? `?query=${encodeURIComponent(query)}` : "";
   const payload = await request(`/news${qs}`);
