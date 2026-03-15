@@ -1,4 +1,4 @@
-const CACHE_NAME = "stock-alert-pwa-v4";
+const CACHE_NAME = "stock-alert-pwa-v5";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -31,7 +31,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   const url = new URL(request.url);
-  if (url.pathname.startsWith("/health") || url.pathname.startsWith("/session") || url.pathname.startsWith("/alerts") || url.pathname.startsWith("/watchlist") || url.pathname.startsWith("/notifications") || url.pathname.startsWith("/stocks") || url.pathname.startsWith("/currency") || url.pathname.startsWith("/news")) {
+  if (url.pathname.startsWith("/health") || url.pathname.startsWith("/session") || url.pathname.startsWith("/alerts") || url.pathname.startsWith("/watchlist") || url.pathname.startsWith("/notifications") || url.pathname.startsWith("/stocks") || url.pathname.startsWith("/currency") || url.pathname.startsWith("/news") || url.pathname.startsWith("/analysis")) {
     return;
   }
 

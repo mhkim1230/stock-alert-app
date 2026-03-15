@@ -26,7 +26,10 @@ class AnalysisService:
         history = await self._fetch_history(yahoo_symbol)
         if not history:
             return None
-        investor_flow = await self._fetch_investor_flow(symbol) if symbol.isdigit() else None
+        if symbol.isdigit():
+            investor_flow = await self._fetch_investor_flow(symbol)
+        else:
+            investor_flow = self._build_global_flow(history)
         news_context = await self._build_news_context(symbol=symbol.upper(), name=stock_name, asset_type="stock")
         return self._build_analysis(
             history=history,
@@ -177,6 +180,7 @@ class AnalysisService:
             return "중립"
 
         return {
+            "market_scope": "domestic",
             "latest_date": latest["date"],
             "latest_foreign": latest["foreign"],
             "latest_institution": latest["institution"],
@@ -185,6 +189,77 @@ class AnalysisService:
             "foreign_direction": direction(foreign_5d),
             "institution_direction": direction(institution_5d),
             "summary": f"최근 5거래일 외국인 {direction(foreign_5d)}, 기관 {direction(institution_5d)}",
+        }
+
+    def _build_global_flow(self, history: List[Dict[str, float]]) -> Optional[Dict]:
+        if len(history) < 25:
+            return None
+
+        recent = history[-20:]
+        closes = [item["close"] for item in recent]
+        volumes = [item.get("volume", 0.0) for item in recent]
+
+        signed_notional = 0.0
+        up_volume = 0.0
+        down_volume = 0.0
+        obv = 0.0
+        obv_20 = []
+        adl = 0.0
+        adl_20 = []
+        previous_close = history[-21]["close"]
+
+        for candle in recent:
+            close = candle["close"]
+            volume = candle.get("volume", 0.0) or 0.0
+            high = candle["high"]
+            low = candle["low"]
+
+            if close > previous_close:
+                signed_notional += close * volume
+                up_volume += volume
+                obv += volume
+            elif close < previous_close:
+                signed_notional -= close * volume
+                down_volume += volume
+                obv -= volume
+
+            spread = high - low
+            money_flow_multiplier = ((close - low) - (high - close)) / spread if spread else 0.0
+            adl += money_flow_multiplier * volume
+
+            obv_20.append(obv)
+            adl_20.append(adl)
+            previous_close = close
+
+        flow_ratio = (up_volume / down_volume) if down_volume > 0 else (9.99 if up_volume > 0 else None)
+        obv_change = obv_20[-1] - obv_20[0]
+        adl_change = adl_20[-1] - adl_20[0]
+
+        positives = sum(1 for value in (signed_notional, obv_change, adl_change) if value > 0)
+        negatives = sum(1 for value in (signed_notional, obv_change, adl_change) if value < 0)
+        if positives >= 2 and (flow_ratio or 0) >= 1:
+            flow_label = "유입 우위"
+        elif negatives >= 2 and (flow_ratio or 0) <= 1:
+            flow_label = "유출 우위"
+        else:
+            flow_label = "혼조"
+
+        def direction(value: float) -> str:
+            if value > 0:
+                return "유입"
+            if value < 0:
+                return "유출"
+            return "중립"
+
+        return {
+            "market_scope": "global",
+            "flow_type": "price_volume",
+            "flow_label": flow_label,
+            "money_flow_20d": round(signed_notional, 2),
+            "up_down_volume_ratio": round(flow_ratio, 2) if flow_ratio is not None else None,
+            "obv_direction": direction(obv_change),
+            "adl_direction": direction(adl_change),
+            "summary": "최근 20거래일 가격·거래량 흐름으로 계산한 해외주식 수급 추정입니다.",
         }
 
     async def _build_news_context(self, symbol: str, name: str, asset_type: str) -> Dict:
@@ -326,6 +401,8 @@ class AnalysisService:
         ]
         if investor_flow:
             notes.append(investor_flow["summary"])
+            if investor_flow.get("market_scope") == "global":
+                notes.append("해외주식 수급은 무료 가격·거래량 데이터 기반 추정치이며, 기관/외국인 실거래 집계는 아닙니다.")
         if news_context.get("summary"):
             notes.append(news_context["summary"])
 
@@ -440,8 +517,13 @@ class AnalysisService:
                 score -= 3
 
         if investor_flow:
-            if investor_flow["foreign_direction"] == investor_flow["institution_direction"] != "중립":
+            if investor_flow.get("market_scope") == "domestic" and investor_flow["foreign_direction"] == investor_flow["institution_direction"] != "중립":
                 score += 5
+            elif investor_flow.get("market_scope") == "global":
+                if investor_flow.get("flow_label") == "유입 우위":
+                    score += 4
+                elif investor_flow.get("flow_label") == "유출 우위":
+                    score -= 4
 
         if news_context.get("news_bias") == "우호적":
             score += 3

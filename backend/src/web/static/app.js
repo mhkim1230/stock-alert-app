@@ -50,11 +50,13 @@ const elements = {
   selectedNewsAlerts: document.getElementById("selected-news-alerts"),
   quickStockSymbol: document.getElementById("quick-stock-symbol"),
   quickNewsKeywords: document.getElementById("quick-news-keywords"),
+  quickStockAlertForm: document.getElementById("quick-stock-alert-form"),
   fxAlertModal: document.getElementById("fx-alert-modal"),
   selectedFxPair: document.getElementById("selected-fx-pair"),
   selectedCurrencyAlerts: document.getElementById("selected-currency-alerts"),
   quickFxBase: document.getElementById("quick-fx-base"),
   quickFxTarget: document.getElementById("quick-fx-target"),
+  quickFxAlertForm: document.getElementById("quick-fx-alert-form"),
   analysisModal: document.getElementById("analysis-modal"),
   analysisBody: document.getElementById("analysis-body"),
 };
@@ -439,6 +441,47 @@ function renderSelectedCurrencyAlerts() {
     : `<li class="empty-state">등록된 환율 알림이 없습니다.</li>`;
 }
 
+function prefillStockAlertForm(symbol, preset = {}) {
+  const form = elements.quickStockAlertForm;
+  form.reset();
+  elements.quickStockSymbol.value = symbol;
+  elements.quickNewsKeywords.value = symbol;
+  const targetInput = form.querySelector("input[name='target_price']");
+  const conditionSelect = form.querySelector("select[name='condition']");
+  if (preset.targetPrice != null) {
+    targetInput.value = Number(preset.targetPrice).toFixed(2);
+  }
+  conditionSelect.value = preset.condition || "above";
+}
+
+function prefillFxAlertForm(base, target, preset = {}) {
+  const form = elements.quickFxAlertForm;
+  form.reset();
+  elements.quickFxBase.value = base;
+  elements.quickFxTarget.value = target;
+  const targetInput = form.querySelector("input[name='target_rate']");
+  const conditionSelect = form.querySelector("select[name='condition']");
+  if (preset.targetRate != null) {
+    targetInput.value = Number(preset.targetRate).toFixed(4);
+  }
+  conditionSelect.value = preset.condition || "above";
+}
+
+function renderAnalysisAlertCard({ label, value, priceUnit, assetType, symbol, base, target, condition, formatter }) {
+  const action = assetType === "currency" ? "prefill-fx-alert" : "prefill-stock-alert";
+  const attrs = assetType === "currency"
+    ? `data-base="${base}" data-target="${target}" data-target-rate="${value}" data-condition="${condition}"`
+    : `data-symbol="${symbol}" data-target-price="${value}" data-condition="${condition}"`;
+
+  return `
+    <div class="stat-card stat-card-action">
+      <small>${label}</small>
+      <strong>${formatter(value, priceUnit)}</strong>
+      <button class="ghost-button small inline-action-button" type="button" data-action="${action}" ${attrs}>알림 추가</button>
+    </div>
+  `;
+}
+
 function renderAnalysis(data) {
   const formatter = data.asset_type === "currency" ? formatRate : formatPrice;
   const indicatorRows = [
@@ -450,22 +493,84 @@ function renderAnalysis(data) {
     { label: "ATR(14)", value: data.atr14 ?? "-" },
   ];
 
-  const investorMarkup = data.investor_flow
-    ? `
+  let investorMarkup = `
+    <div class="analysis-section">
+      <h5>수급 흐름</h5>
+      <div class="callout">수급 데이터를 계산하지 못했습니다.</div>
+    </div>
+  `;
+  if (data.investor_flow?.market_scope === "domestic") {
+    investorMarkup = `
       <div class="analysis-section">
         <h5>수급 흐름</h5>
         <div class="analysis-grid compact-analysis-grid">
           <div class="stat-card"><small>외국인 5일</small><strong>${data.investor_flow.foreign_direction} ${Number(data.investor_flow.foreign_5d).toLocaleString("ko-KR")}</strong></div>
           <div class="stat-card"><small>기관 5일</small><strong>${data.investor_flow.institution_direction} ${Number(data.investor_flow.institution_5d).toLocaleString("ko-KR")}</strong></div>
         </div>
-      </div>
-    `
-    : `
-      <div class="analysis-section">
-        <h5>수급 흐름</h5>
-        <div class="callout">기관/외국인 수급 데이터는 현재 국내 주식에만 반영됩니다.</div>
+        <div class="callout compact-callout">${data.investor_flow.summary}</div>
       </div>
     `;
+  } else if (data.investor_flow?.market_scope === "global") {
+    investorMarkup = `
+      <div class="analysis-section">
+        <h5>수급 흐름</h5>
+        <div class="analysis-grid compact-analysis-grid">
+          <div class="stat-card"><small>20일 수급 추정</small><strong>${data.investor_flow.flow_label || "-"}</strong></div>
+          <div class="stat-card"><small>상승/하락 거래량 비율</small><strong>${data.investor_flow.up_down_volume_ratio ? `${data.investor_flow.up_down_volume_ratio.toFixed(2)}배` : "-"}</strong></div>
+          <div class="stat-card"><small>OBV 방향</small><strong>${data.investor_flow.obv_direction || "-"}</strong></div>
+          <div class="stat-card"><small>자금누적 방향</small><strong>${data.investor_flow.adl_direction || "-"}</strong></div>
+        </div>
+        <div class="callout compact-callout">${data.investor_flow.summary}</div>
+      </div>
+    `;
+  }
+
+  const buySellCards = [
+    renderAnalysisAlertCard({
+      label: "1차 매수가",
+      value: data.first_buy,
+      priceUnit: data.price_unit,
+      assetType: data.asset_type,
+      symbol: data.symbol,
+      base: data.symbol.split("/")[0],
+      target: data.symbol.split("/")[1],
+      condition: "below",
+      formatter,
+    }),
+    renderAnalysisAlertCard({
+      label: "2차 매수가",
+      value: data.second_buy,
+      priceUnit: data.price_unit,
+      assetType: data.asset_type,
+      symbol: data.symbol,
+      base: data.symbol.split("/")[0],
+      target: data.symbol.split("/")[1],
+      condition: "below",
+      formatter,
+    }),
+    renderAnalysisAlertCard({
+      label: "1차 매도가",
+      value: data.first_sell,
+      priceUnit: data.price_unit,
+      assetType: data.asset_type,
+      symbol: data.symbol,
+      base: data.symbol.split("/")[0],
+      target: data.symbol.split("/")[1],
+      condition: "above",
+      formatter,
+    }),
+    renderAnalysisAlertCard({
+      label: "2차 매도가",
+      value: data.second_sell,
+      priceUnit: data.price_unit,
+      assetType: data.asset_type,
+      symbol: data.symbol,
+      base: data.symbol.split("/")[0],
+      target: data.symbol.split("/")[1],
+      condition: "above",
+      formatter,
+    }),
+  ];
 
   const newsMarkup = `
     <div class="analysis-section">
@@ -490,10 +595,7 @@ function renderAnalysis(data) {
     </div>
     <div class="analysis-grid">
       <div class="stat-card"><small>분석 신뢰도</small><strong>${data.confidence_score}점 · ${data.confidence_label}</strong></div>
-      <div class="stat-card"><small>1차 매수가</small><strong>${formatter(data.first_buy, data.price_unit)}</strong></div>
-      <div class="stat-card"><small>2차 매수가</small><strong>${formatter(data.second_buy, data.price_unit)}</strong></div>
-      <div class="stat-card"><small>1차 매도가</small><strong>${formatter(data.first_sell, data.price_unit)}</strong></div>
-      <div class="stat-card"><small>2차 매도가</small><strong>${formatter(data.second_sell, data.price_unit)}</strong></div>
+      ${buySellCards.join("")}
       <div class="stat-card"><small>손절 기준</small><strong>${formatter(data.stop_loss, data.price_unit)}</strong></div>
       <div class="stat-card"><small>데이터 소스</small><strong>${data.source}</strong></div>
     </div>
@@ -695,11 +797,10 @@ function closeStockSearchModal() {
   elements.stockSearchModal.classList.add("hidden");
 }
 
-function openStockAlertModal(symbol) {
+function openStockAlertModal(symbol, preset = null) {
   state.selectedAlertSymbol = symbol;
   elements.selectedAlertSymbol.textContent = symbol;
-  elements.quickStockSymbol.value = symbol;
-  elements.quickNewsKeywords.value = symbol;
+  prefillStockAlertForm(symbol, preset || {});
   renderSelectedStockAlerts();
   elements.stockAlertModal.classList.remove("hidden");
 }
@@ -709,11 +810,10 @@ function closeStockAlertModal() {
   elements.stockAlertModal.classList.add("hidden");
 }
 
-function openFxAlertModal(base, target) {
+function openFxAlertModal(base, target, preset = null) {
   state.selectedFxPair = { base, target };
   elements.selectedFxPair.textContent = `${base}/${target}`;
-  elements.quickFxBase.value = base;
-  elements.quickFxTarget.value = target;
+  prefillFxAlertForm(base, target, preset || {});
   renderSelectedCurrencyAlerts();
   elements.fxAlertModal.classList.remove("hidden");
 }
@@ -1036,12 +1136,26 @@ async function handleListActions(event) {
       openStockAlertModal(trigger.dataset.symbol);
       return;
     }
+    if (action === "prefill-stock-alert") {
+      openStockAlertModal(trigger.dataset.symbol, {
+        targetPrice: Number(trigger.dataset.targetPrice),
+        condition: trigger.dataset.condition,
+      });
+      return;
+    }
     if (action === "close-alert-modal") {
       closeStockAlertModal();
       return;
     }
     if (action === "open-fx-alert-modal") {
       openFxAlertModal(trigger.dataset.base, trigger.dataset.target);
+      return;
+    }
+    if (action === "prefill-fx-alert") {
+      openFxAlertModal(trigger.dataset.base, trigger.dataset.target, {
+        targetRate: Number(trigger.dataset.targetRate),
+        condition: trigger.dataset.condition,
+      });
       return;
     }
     if (action === "close-fx-alert-modal") {

@@ -136,6 +136,17 @@ a {
   margin-top: 4px;
 }
 
+.stat-card-action {
+  display: grid;
+  gap: 8px;
+}
+
+.inline-action-button {
+  justify-self: flex-start;
+  padding: 8px 12px;
+  font-size: 0.86rem;
+}
+
 .panel-card {
   padding: 14px;
 }
