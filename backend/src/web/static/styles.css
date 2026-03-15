@@ -57,17 +57,17 @@ a {
 .app-shell {
   width: min(1120px, calc(100% - 24px));
   margin: 0 auto;
-  padding: 8px 0 16px;
+  padding: 6px 0 12px;
 }
 
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  padding: 10px 12px;
-  border-radius: 18px;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 16px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 12px 28px rgba(25, 31, 40, 0.06);
@@ -88,14 +88,14 @@ a {
 }
 
 .topbar h1 {
-  font-size: clamp(1.02rem, 1.8vw, 1.22rem);
-  line-height: 1.15;
+  font-size: clamp(0.96rem, 1.7vw, 1.14rem);
+  line-height: 1.1;
 }
 
 .eyebrow {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   color: var(--muted);
-  font-size: 0.64rem;
+  font-size: 0.58rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -112,7 +112,7 @@ a {
 .app-grid,
 .panel-grid {
   display: grid;
-  gap: 18px;
+  gap: 12px;
 }
 
 .panel-card,
@@ -125,7 +125,7 @@ a {
 }
 
 .panel-card {
-  padding: 14px;
+  padding: 12px;
 }
 
 .login-panel {
@@ -136,14 +136,14 @@ a {
 
 .login-card {
   width: min(100%, 520px);
-  padding: 26px;
+  padding: 22px;
 }
 
 .mobile-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: 5px;
+  margin-bottom: 8px;
 }
 
 .tab-button,
@@ -156,11 +156,11 @@ a {
 }
 
 .tab-button {
-  padding: 9px 10px;
+  padding: 8px 8px;
   background: rgba(255, 255, 255, 0.88);
   color: var(--muted);
   border: 1px solid var(--line);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
@@ -171,44 +171,44 @@ a {
 }
 
 .ghost-button {
-  padding: 8px 12px;
+  padding: 7px 10px;
   background: rgba(49, 130, 246, 0.1);
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .ghost-button.small {
-  padding: 7px 9px;
-  font-size: 0.74rem;
+  padding: 6px 8px;
+  font-size: 0.7rem;
 }
 
 .icon-button {
-  width: 36px;
-  min-width: 36px;
-  height: 36px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: 0.92rem;
 }
 
 .primary-button {
-  padding: 9px 13px;
+  padding: 8px 11px;
   background: linear-gradient(180deg, #4f9cff 0%, var(--accent) 100%);
   color: #fff;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 700;
   box-shadow: 0 12px 24px rgba(49, 130, 246, 0.22);
 }
 
 .danger-button {
-  padding: 7px 9px;
+  padding: 6px 8px;
   background: rgba(240, 68, 82, 0.12);
   color: var(--danger);
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -225,7 +225,7 @@ button:disabled {
 
 .content-grid {
   display: grid;
-  min-height: calc(100dvh - 150px);
+  min-height: calc(100dvh - 138px);
 }
 
 .view {
@@ -237,7 +237,7 @@ button:disabled {
 }
 
 .view[data-view-panel="watchlist"] {
-  min-height: calc(100dvh - 150px);
+  min-height: calc(100dvh - 138px);
 }
 
 .dashboard-grid {
@@ -245,11 +245,11 @@ button:disabled {
 }
 
 .compact-panel {
-  padding: 14px;
+  padding: 12px;
 }
 
 .watchlist-panel {
-  min-height: calc(100dvh - 170px);
+  min-height: calc(100dvh - 154px);
   display: flex;
   flex-direction: column;
 }
@@ -257,11 +257,11 @@ button:disabled {
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 .stat-card {
-  padding: 14px;
+  padding: 11px;
   border-radius: var(--radius-md);
   background: var(--surface-soft);
   border: 1px solid rgba(49, 130, 246, 0.08);
@@ -271,20 +271,20 @@ button:disabled {
   display: block;
   color: inherit;
   opacity: 0.78;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
 }
 
 .stat-card strong {
   display: block;
-  margin-top: 6px;
-  font-size: 1rem;
+  margin-top: 4px;
+  font-size: 0.92rem;
   letter-spacing: -0.02em;
   font-weight: 700;
 }
 
 .stat-card-action {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .inline-action-button {
@@ -295,12 +295,12 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .panel-head h3 {
-  font-size: 0.94rem;
+  font-size: 0.88rem;
 }
 
 .inline-form,
@@ -308,7 +308,7 @@ button:disabled {
 .triple-grid,
 .stack {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .inline-form {
@@ -330,17 +330,17 @@ button:disabled {
 
 .stack.compact,
 .compact {
-  gap: 10px;
+  gap: 8px;
   margin: 0;
 }
 
 .field {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .field span {
-  font-size: 0.76rem;
+  font-size: 0.7rem;
   color: var(--muted);
 }
 
@@ -349,10 +349,10 @@ button:disabled {
   width: 100%;
   border: 1px solid var(--line-strong);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 9px 10px;
   background: #fff;
   color: var(--text);
-  min-height: 40px;
+  min-height: 36px;
 }
 
 .grow {
@@ -365,11 +365,11 @@ button:disabled {
 .pill-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .quick-actions {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .compact-actions {
@@ -381,7 +381,7 @@ button:disabled {
 .timeline-list,
 .news-list {
   list-style: none;
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   padding: 0;
   display: grid;
   gap: 8px;
@@ -398,7 +398,7 @@ button:disabled {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.96);
   border-radius: 18px;
-  padding: 11px;
+  padding: 10px;
 }
 
 .resource-item {
@@ -478,15 +478,15 @@ button:disabled {
 }
 
 .resource-title {
-  font-size: 0.85rem;
-  line-height: 1.2;
+  font-size: 0.82rem;
+  line-height: 1.15;
   letter-spacing: -0.03em;
 }
 
 .meta-line {
   color: var(--muted);
   font-size: 0.73rem;
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 .quote-line {
@@ -497,7 +497,7 @@ button:disabled {
 }
 
 .quote-price {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -524,24 +524,24 @@ button:disabled {
 .timeline-item,
 .news-item {
   display: grid;
-  gap: 7px;
+  gap: 5px;
 }
 
 .timeline-item small,
 .news-item small,
 .resource-meta small {
   color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.45;
+  font-size: 0.74rem;
+  line-height: 1.3;
 }
 
 .callout,
 .empty-state {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: 14px;
   background: #f5f7fb;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
 .compact-callout {
@@ -560,7 +560,7 @@ button:disabled {
 .scroll-area {
   max-height: min(38vh, 320px);
   overflow: auto;
-  padding-right: 4px;
+  padding-right: 2px;
 }
 
 .scroll-area.tall {
@@ -616,8 +616,8 @@ button:disabled {
 }
 
 .helper-text {
-  margin: 10px 0 0;
-  font-size: 0.88rem;
+  margin: 8px 0 0;
+  font-size: 0.76rem;
 }
 
 .result-pill {
@@ -645,7 +645,7 @@ button:disabled {
   z-index: 1100;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: 16px;
 }
 
 .analysis-modal {
@@ -671,7 +671,7 @@ button:disabled {
   width: min(100%, 760px);
   max-height: min(82vh, 780px);
   overflow: auto;
-  padding: 18px;
+  padding: 16px;
   border-radius: 28px;
   border: 1px solid var(--line);
   background: #fff;
@@ -683,14 +683,14 @@ button:disabled {
   width: min(980px, 100%);
   max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
   height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
-  border-radius: 34px;
+  border-radius: 28px;
 }
 
 .modal-sticky-head {
   position: sticky;
   top: 0;
   z-index: 2;
-  margin: 0 -18px 12px;
+  margin: 0 -16px 10px;
   padding: calc(env(safe-area-inset-top) + 16px) 18px 10px;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(14px);
@@ -724,9 +724,9 @@ button:disabled {
 .analysis-range-switch {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  margin-bottom: 12px;
-  padding: 4px;
+  gap: 3px;
+  margin-bottom: 10px;
+  padding: 3px;
   border-radius: 16px;
   background: rgba(49, 130, 246, 0.08);
   position: sticky;
@@ -739,9 +739,9 @@ button:disabled {
   border-radius: 12px;
   background: transparent;
   color: var(--muted);
-  padding: 9px 8px;
+  padding: 8px 6px;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   min-width: 0;
   white-space: nowrap;
 }
@@ -754,21 +754,21 @@ button:disabled {
 
 .analysis-body {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .analysis-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .analysis-hero-card,
 .analysis-section-card {
   display: grid;
-  gap: 12px;
-  padding: 18px;
-  border-radius: 24px;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 20px;
   background: #fff;
   border: 1px solid var(--line);
 }
@@ -780,7 +780,7 @@ button:disabled {
 .analysis-section-card h5,
 .analysis-hero-card h4 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.92rem;
   letter-spacing: -0.03em;
 }
 
@@ -788,24 +788,24 @@ button:disabled {
   display: inline-flex;
   width: fit-content;
   align-items: center;
-  padding: 7px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 0.84rem;
+  font-size: 0.76rem;
   font-weight: 700;
 }
 
 .analysis-copy {
   margin: 0;
   color: var(--text);
-  line-height: 1.7;
-  font-size: 0.96rem;
+  line-height: 1.5;
+  font-size: 0.84rem;
 }
 
 .analysis-copy-group {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .analysis-copy strong {
@@ -816,15 +816,17 @@ button:disabled {
 .analysis-plan-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .analysis-notes {
   margin: 0;
   padding-left: 18px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .toast-root {
@@ -875,23 +877,23 @@ button:disabled {
 @media (max-width: 720px) {
   .app-shell {
     width: min(100% - 16px, 100%);
-    padding-top: 8px;
+    padding-top: 6px;
   }
 
   .topbar {
     flex-direction: row;
     align-items: center;
-    gap: 8px;
-    padding: 9px 10px;
-    border-radius: 16px;
+    gap: 6px;
+    padding: 7px 8px;
+    border-radius: 14px;
   }
 
   .mobile-tabs {
     position: sticky;
     top: 6px;
     z-index: 20;
-    padding: 5px;
-    border-radius: 16px;
+    padding: 4px;
+    border-radius: 14px;
     background: rgba(248, 251, 255, 0.92);
     backdrop-filter: blur(18px);
   }
@@ -921,12 +923,12 @@ button:disabled {
   }
 
   .topbar h1 {
-    font-size: 1rem;
+    font-size: 0.92rem;
   }
 
   .eyebrow {
-    font-size: 0.6rem;
-    margin-bottom: 2px;
+    font-size: 0.54rem;
+    margin-bottom: 1px;
   }
 
   #refresh-dashboard {
@@ -936,13 +938,13 @@ button:disabled {
   .content-grid,
   .view[data-view-panel="watchlist"],
   .watchlist-panel {
-    min-height: calc(100dvh - 132px);
+    min-height: calc(100dvh - 120px);
   }
 
   .field input,
   .field select {
-    min-height: 38px;
-    padding: 9px 11px;
+    min-height: 34px;
+    padding: 8px 9px;
   }
 
   #fx-result .resource-item {
@@ -996,13 +998,13 @@ button:disabled {
   }
 
   .modal {
-    padding: 10px;
+    padding: 8px;
   }
 
   .modal-card {
     width: 100%;
     max-height: 88vh;
-    padding: 14px;
+    padding: 12px;
   }
 
   .modal-sticky-head {
@@ -1032,8 +1034,8 @@ button:disabled {
   }
 
   .analysis-range-tab {
-    padding: 8px 4px;
-    font-size: 0.74rem;
+    padding: 7px 3px;
+    font-size: 0.7rem;
     letter-spacing: -0.03em;
   }
 
@@ -1050,7 +1052,7 @@ button:disabled {
 
   .analysis-header-copy h3 {
     flex: 0 0 auto;
-    font-size: 0.9rem;
+    font-size: 0.84rem;
     line-height: 1.15;
   }
 
@@ -1061,12 +1063,12 @@ button:disabled {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     line-height: 1.2;
   }
 
   .analysis-header-price {
-    font-size: 0.9rem;
+    font-size: 0.84rem;
   }
 
   .analysis-header-side {
@@ -1077,8 +1079,8 @@ button:disabled {
   }
 
   .analysis-header-side .ghost-button.small {
-    padding: 6px 8px;
-    font-size: 0.68rem;
+    padding: 5px 7px;
+    font-size: 0.64rem;
   }
 
   .scroll-area {
