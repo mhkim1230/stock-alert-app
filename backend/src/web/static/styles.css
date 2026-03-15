@@ -691,7 +691,7 @@ button:disabled {
   top: 0;
   z-index: 2;
   margin: 0 -18px 12px;
-  padding: calc(env(safe-area-inset-top) + 18px) 18px 12px;
+  padding: calc(env(safe-area-inset-top) + 16px) 18px 10px;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
@@ -702,21 +702,22 @@ button:disabled {
 }
 
 .analysis-header-side {
-  display: grid;
-  justify-items: end;
-  gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .analysis-subtitle {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--muted);
-  font-size: 0.94rem;
-  line-height: 1.5;
+  font-size: 0.86rem;
+  line-height: 1.35;
 }
 
 .analysis-header-price {
   font-family: var(--font-display);
-  font-size: 1.12rem;
+  font-size: 1rem;
   letter-spacing: -0.03em;
 }
 
@@ -949,11 +950,11 @@ button:disabled {
   }
 
   #fx-result .swipe-actions {
-    width: 148px;
+    width: 140px;
   }
 
   #fx-result .swipe-card {
-    --swipe-open-width: 148px;
+    --swipe-open-width: 140px;
   }
 
   #fx-result .swipe-card.open .swipe-item-content {
@@ -961,18 +962,18 @@ button:disabled {
   }
 
   .swipe-card {
-    --swipe-open-width: 148px;
+    --swipe-open-width: 140px;
   }
 
   .swipe-actions {
-    gap: 3px;
-    padding: 4px;
+    gap: 2px;
+    padding: 3px;
   }
 
   .swipe-actions .ghost-button,
   .swipe-actions .danger-button {
-    font-size: 0.68rem;
-    padding-inline: 4px;
+    font-size: 0.64rem;
+    padding-inline: 3px;
   }
 
   .swipe-card.open .swipe-item-content {
@@ -1006,7 +1007,9 @@ button:disabled {
 
   .modal-sticky-head {
     margin: 0 -14px 12px;
-    padding: calc(env(safe-area-inset-top) + 14px) 14px 10px;
+    padding: calc(env(safe-area-inset-top) + 10px) 14px 8px;
+    align-items: center;
+    gap: 8px;
   }
 
   .analysis-modal {
@@ -1023,7 +1026,7 @@ button:disabled {
 
   .analysis-range-switch {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    top: calc(env(safe-area-inset-top) + 112px);
+    top: calc(env(safe-area-inset-top) + 76px);
     gap: 3px;
     padding: 3px;
   }
@@ -1034,9 +1037,48 @@ button:disabled {
     letter-spacing: -0.03em;
   }
 
+  .modal-sticky-head .eyebrow {
+    display: none;
+  }
+
+  .analysis-header-copy {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .analysis-header-copy h3 {
+    flex: 0 0 auto;
+    font-size: 0.9rem;
+    line-height: 1.15;
+  }
+
+  .analysis-subtitle {
+    margin: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.72rem;
+    line-height: 1.2;
+  }
+
+  .analysis-header-price {
+    font-size: 0.9rem;
+  }
+
   .analysis-header-side {
-    width: 100%;
-    justify-items: start;
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .analysis-header-side .ghost-button.small {
+    padding: 6px 8px;
+    font-size: 0.68rem;
   }
 
   .scroll-area {

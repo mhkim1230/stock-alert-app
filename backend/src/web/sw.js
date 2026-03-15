@@ -1,4 +1,4 @@
-const CACHE_NAME = "stock-alert-pwa-v14";
+const CACHE_NAME = "stock-alert-pwa-v15";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
