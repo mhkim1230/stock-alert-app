@@ -10,6 +10,15 @@ class HealthResponse(BaseModel):
     environment: str
 
 
+class SessionLoginRequest(BaseModel):
+    password: str = Field(..., min_length=1)
+
+
+class SessionStatusResponse(BaseModel):
+    authenticated: bool
+    mode: str
+
+
 class DeviceTokenCreate(BaseModel):
     token: str
     platform: str = "iOS"

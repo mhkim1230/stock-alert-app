@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#112b1f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Stock Alert" />
+    <title>Stock Alert</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Personal Market Desk</p>
+          <h1>Stock Alert PWA</h1>
+        </div>
+        <div class="topbar-actions">
+          <button id="install-button" class="ghost-button hidden" type="button">홈 화면 추가</button>
+          <button id="logout-button" class="ghost-button hidden" type="button">로그아웃</button>
+        </div>
+      </header>
+
+      <main id="app" class="app-grid">
+        <section id="login-panel" class="login-panel">
+          <div class="login-card">
+            <p class="eyebrow">Single-user Access</p>
+            <h2>비밀번호로 접속</h2>
+            <p class="muted">
+              회원가입 없이 단일 관리자 비밀번호로 접속합니다. 로그인 후 같은 브라우저에서는 세션이 유지됩니다.
+            </p>
+            <form id="login-form" class="stack">
+              <label class="field">
+                <span>관리자 비밀번호</span>
+                <input id="password-input" name="password" type="password" autocomplete="current-password" required />
+              </label>
+              <button class="primary-button" type="submit">접속</button>
+            </form>
+            <p id="login-error" class="error-text hidden"></p>
+          </div>
+        </section>
+
+        <section id="app-panel" class="hidden">
+          <div class="hero-card">
+            <div>
+              <p class="eyebrow">Cloud-only setup</p>
+              <h2>맥을 꺼도 그대로 유지됩니다</h2>
+              <p class="muted">
+                현재 사이트는 Render와 Supabase 위에서 동작합니다. 관심종목, 알림, 기록은 모두 클라우드에 저장됩니다.
+              </p>
+            </div>
+            <div class="hero-stats" id="hero-stats"></div>
+          </div>
+
+          <nav class="mobile-tabs" aria-label="앱 섹션">
+            <button class="tab-button active" data-view="dashboard" type="button">대시보드</button>
+            <button class="tab-button" data-view="watchlist" type="button">관심종목</button>
+            <button class="tab-button" data-view="alerts" type="button">알림</button>
+            <button class="tab-button" data-view="explore" type="button">탐색</button>
+            <button class="tab-button" data-view="settings" type="button">설정</button>
+          </nav>
+
+          <div class="content-grid">
+            <section class="view active" data-view-panel="dashboard">
+              <div class="panel-grid">
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">Quick Summary</p>
+                      <h3>현재 상태</h3>
+                    </div>
+                    <button id="refresh-dashboard" class="ghost-button small" type="button">새로고침</button>
+                  </div>
+                  <div id="summary-grid" class="summary-grid"></div>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">Recent Activity</p>
+                      <h3>최근 알림</h3>
+                    </div>
+                  </div>
+                  <ul id="dashboard-notifications" class="timeline-list"></ul>
+                </article>
+              </div>
+            </section>
+
+            <section class="view" data-view-panel="watchlist">
+              <div class="panel-card">
+                <div class="panel-head">
+                  <div>
+                    <p class="eyebrow">Watchlist</p>
+                    <h3>관심종목 관리</h3>
+                  </div>
+                </div>
+                <form id="watchlist-form" class="inline-form">
+                  <label class="field grow">
+                    <span>종목 코드</span>
+                    <input name="symbol" placeholder="AAPL 또는 005930" required />
+                  </label>
+                  <button class="primary-button" type="submit">추가</button>
+                </form>
+                <ul id="watchlist-list" class="resource-list"></ul>
+              </div>
+            </section>
+
+            <section class="view" data-view-panel="alerts">
+              <div class="panel-grid">
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">Stocks</p>
+                      <h3>주식 알림</h3>
+                    </div>
+                  </div>
+                  <form id="stock-alert-form" class="stack compact">
+                    <div class="double-grid">
+                      <label class="field">
+                        <span>종목 코드</span>
+                        <input name="stock_symbol" placeholder="TSLA" required />
+                      </label>
+                      <label class="field">
+                        <span>목표 가격</span>
+                        <input name="target_price" type="number" min="0.01" step="0.01" required />
+                      </label>
+                    </div>
+                    <label class="field">
+                      <span>조건</span>
+                      <select name="condition">
+                        <option value="above">이상</option>
+                        <option value="below">이하</option>
+                        <option value="equal">같음</option>
+                      </select>
+                    </label>
+                    <button class="primary-button" type="submit">주식 알림 추가</button>
+                  </form>
+                  <ul id="stock-alert-list" class="resource-list"></ul>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">Currencies</p>
+                      <h3>환율 알림</h3>
+                    </div>
+                  </div>
+                  <form id="currency-alert-form" class="stack compact">
+                    <div class="triple-grid">
+                      <label class="field">
+                        <span>기준</span>
+                        <input name="base_currency" placeholder="USD" maxlength="3" required />
+                      </label>
+                      <label class="field">
+                        <span>대상</span>
+                        <input name="target_currency" placeholder="KRW" maxlength="3" required />
+                      </label>
+                      <label class="field">
+                        <span>조건</span>
+                        <select name="condition">
+                          <option value="above">이상</option>
+                          <option value="below">이하</option>
+                          <option value="equal">같음</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label class="field">
+                      <span>목표 환율</span>
+                      <input name="target_rate" type="number" min="0.0001" step="0.0001" required />
+                    </label>
+                    <button class="primary-button" type="submit">환율 알림 추가</button>
+                  </form>
+                  <ul id="currency-alert-list" class="resource-list"></ul>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">News</p>
+                      <h3>뉴스 키워드 알림</h3>
+                    </div>
+                  </div>
+                  <form id="news-alert-form" class="stack compact">
+                    <label class="field">
+                      <span>키워드</span>
+                      <input name="keywords" placeholder="NVIDIA, FOMC, 반도체" required />
+                    </label>
+                    <button class="primary-button" type="submit">뉴스 알림 추가</button>
+                  </form>
+                  <ul id="news-alert-list" class="resource-list"></ul>
+                </article>
+              </div>
+            </section>
+
+            <section class="view" data-view-panel="explore">
+              <div class="panel-grid">
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">Market Search</p>
+                      <h3>종목 탐색</h3>
+                    </div>
+                  </div>
+                  <form id="stock-search-form" class="inline-form">
+                    <label class="field grow">
+                      <span>검색어</span>
+                      <input name="query" placeholder="Apple, Tesla, 삼성전자" required />
+                    </label>
+                    <button class="primary-button" type="submit">검색</button>
+                  </form>
+                  <ul id="stock-search-results" class="resource-list"></ul>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">FX</p>
+                      <h3>환율 조회</h3>
+                    </div>
+                  </div>
+                  <form id="fx-form" class="inline-form">
+                    <label class="field">
+                      <span>기준</span>
+                      <input name="base" value="USD" maxlength="3" required />
+                    </label>
+                    <label class="field">
+                      <span>대상</span>
+                      <input name="target" value="KRW" maxlength="3" required />
+                    </label>
+                    <button class="primary-button" type="submit">조회</button>
+                  </form>
+                  <div id="fx-result" class="empty-state">환율을 조회하면 여기에 표시됩니다.</div>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">Latest News</p>
+                      <h3>뉴스 보기</h3>
+                    </div>
+                  </div>
+                  <form id="news-form" class="inline-form">
+                    <label class="field grow">
+                      <span>검색어</span>
+                      <input name="query" placeholder="AI, 금리, 삼성전자" />
+                    </label>
+                    <button class="primary-button" type="submit">불러오기</button>
+                  </form>
+                  <ul id="news-results" class="news-list"></ul>
+                </article>
+              </div>
+            </section>
+
+            <section class="view" data-view-panel="settings">
+              <div class="panel-grid">
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">PWA</p>
+                      <h3>설치와 사용</h3>
+                    </div>
+                  </div>
+                  <div class="stack">
+                    <div class="callout">
+                      iPhone에서는 Safari의 공유 메뉴에서 <strong>홈 화면에 추가</strong>를 누르면 앱처럼 실행할 수 있습니다.
+                    </div>
+                    <button id="settings-install-button" class="primary-button hidden" type="button">이 기기에 설치</button>
+                  </div>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">Session</p>
+                      <h3>접속 상태</h3>
+                    </div>
+                  </div>
+                  <div class="stack">
+                    <div id="session-status" class="callout success">로그인 세션이 활성화되어 있습니다.</div>
+                    <button id="settings-logout-button" class="ghost-button" type="button">로그아웃</button>
+                  </div>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">Notifications</p>
+                      <h3>알림 기록</h3>
+                    </div>
+                  </div>
+                  <ul id="settings-notifications" class="timeline-list"></ul>
+                </article>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast-root" class="toast-root" aria-live="polite"></div>
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>

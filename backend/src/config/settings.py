@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     debug: bool = False
     database_url: str
     admin_api_key: str
+    admin_password: Optional[str] = None
+    session_secret: Optional[str] = None
+    session_cookie_name: str = "stock_alert_session"
+    session_max_age_days: int = 30
     auto_create_tables: bool = True
     allowed_origins: List[str] = ["*"]
     request_timeout: int = 10
@@ -52,6 +56,14 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         return self.database_url
+
+    @property
+    def ADMIN_PASSWORD(self) -> str:
+        return self.admin_password or self.admin_api_key
+
+    @property
+    def SESSION_SECRET(self) -> str:
+        return self.session_secret or self.admin_api_key
 
     @property
     def CACHE_TIMEOUT(self) -> int:

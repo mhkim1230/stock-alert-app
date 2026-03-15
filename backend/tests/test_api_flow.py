@@ -10,6 +10,16 @@ async def test_requires_admin_key(client):
 
 
 @pytest.mark.asyncio
+async def test_session_login_allows_cookie_access(logged_in_client):
+    me = await logged_in_client.get("/session/me")
+    assert me.status_code == 200
+    assert me.json()["authenticated"] is True
+
+    watchlist = await logged_in_client.get("/watchlist")
+    assert watchlist.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_watchlist_and_alert_crud(client, auth_headers):
     create_watchlist = await client.post("/watchlist", json={"symbol": "AAPL"}, headers=auth_headers)
     assert create_watchlist.status_code == 201

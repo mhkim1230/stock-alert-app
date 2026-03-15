@@ -1,0 +1,27 @@
+{
+  "name": "Stock Alert",
+  "short_name": "Stock Alert",
+  "description": "개인용 주식, 환율, 뉴스 알림 PWA",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e1d16",
+  "theme_color": "#112b1f",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
