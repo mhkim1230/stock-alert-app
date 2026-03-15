@@ -14,6 +14,10 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
+    <div id="loading-indicator" class="loading-indicator hidden" aria-live="polite" aria-atomic="true">
+      <div class="loading-bar"></div>
+      <p id="loading-text">불러오는 중입니다...</p>
+    </div>
     <div class="app-shell">
       <header class="topbar">
         <div>
@@ -50,7 +54,7 @@
             <div>
               <p class="eyebrow">Cloud-only setup</p>
               <p class="muted compact">
-                Render와 Supabase에서 동작합니다. 맥을 꺼도 관심종목, 환율 알림, 뉴스 기록이 유지됩니다.
+                Render와 Supabase에서 동작합니다. 맥을 꺼도 관심종목과 알림 기록이 그대로 유지됩니다.
               </p>
             </div>
             <div class="hero-stats" id="hero-stats"></div>
@@ -77,7 +81,7 @@
                   <div id="summary-grid" class="summary-grid"></div>
                   <div class="quick-actions">
                     <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
-                    <button class="ghost-button" type="button" data-action="go-to-alerts">알림 관리로 이동</button>
+                    <button class="ghost-button" type="button" data-action="go-to-currency-alert">환율 알림</button>
                   </div>
                 </article>
 
@@ -87,6 +91,7 @@
                       <p class="eyebrow">FX</p>
                       <h3>환율 조회</h3>
                     </div>
+                    <button class="ghost-button small" type="button" data-action="go-to-currency-alert">환율 알림</button>
                   </div>
                   <form id="fx-form" class="inline-form compact-form">
                     <label class="field">
@@ -162,27 +167,13 @@
                 </div>
 
                 <div class="alert-view active" data-alert-panel="stocks">
-                  <form id="stock-alert-form" class="stack compact">
-                    <div class="double-grid">
-                      <label class="field">
-                        <span>종목 코드</span>
-                        <input name="stock_symbol" placeholder="TSLA" required />
-                      </label>
-                      <label class="field">
-                        <span>목표 가격</span>
-                        <input name="target_price" type="number" min="0.01" step="0.01" required />
-                      </label>
-                    </div>
-                    <label class="field">
-                      <span>조건</span>
-                      <select name="condition">
-                        <option value="above">이상</option>
-                        <option value="below">이하</option>
-                        <option value="equal">같음</option>
-                      </select>
-                    </label>
-                    <button class="primary-button" type="submit">주식 알림 추가</button>
-                  </form>
+                  <div class="callout compact-callout">
+                    주식 알림은 관심종목 목록이나 종목 검색 결과의 <strong>알림</strong> 버튼에서 추가해 주세요.
+                  </div>
+                  <div class="quick-actions compact-actions">
+                    <button class="primary-button" type="button" data-action="open-stock-search">종목 검색</button>
+                    <button class="ghost-button" type="button" data-action="go-to-watchlist">관심종목으로 이동</button>
+                  </div>
                   <ul id="stock-alert-list" class="resource-list scroll-area"></ul>
                 </div>
 
@@ -291,6 +282,7 @@
           </label>
           <button class="primary-button" type="submit">검색</button>
         </form>
+        <p class="muted compact helper-text">한글 종목명, 영문명, 티커, 숫자 코드로 검색할 수 있습니다. Enter로 바로 조회됩니다.</p>
         <ul id="stock-search-results" class="resource-list scroll-area tall"></ul>
       </div>
     </div>

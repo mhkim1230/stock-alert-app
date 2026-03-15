@@ -126,6 +126,7 @@ class NotificationResponse(BaseModel):
 class StockQuoteResponse(BaseModel):
     symbol: str
     name: str
+    market: Optional[str] = None
     price: float
     change: Optional[float] = None
     change_percent: Optional[float] = None

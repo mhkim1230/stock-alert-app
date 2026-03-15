@@ -55,7 +55,7 @@ a {
 .app-shell {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 12px 16px 16px;
 }
 
 .topbar {
@@ -63,7 +63,7 @@ a {
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .topbar h1,
@@ -112,8 +112,8 @@ a {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
   gap: 16px;
-  padding: 18px 20px;
-  margin-bottom: 14px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
 }
 
 .hero-stats,
@@ -124,7 +124,7 @@ a {
 }
 
 .stat-card {
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-radius: var(--radius-md);
   background: linear-gradient(180deg, rgba(17, 43, 31, 0.06), rgba(17, 43, 31, 0.02));
   border: 1px solid rgba(17, 43, 31, 0.08);
@@ -137,7 +137,7 @@ a {
 }
 
 .panel-card {
-  padding: 16px;
+  padding: 14px;
 }
 
 .panel-head {
@@ -152,7 +152,7 @@ a {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .tab-button,
@@ -190,6 +190,12 @@ a {
   padding: 11px 16px;
   background: var(--accent);
   color: #f7f4ee;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+  transform: none !important;
 }
 
 .primary-button:hover,
@@ -324,6 +330,10 @@ a {
   color: var(--muted);
 }
 
+.compact-callout {
+  margin-bottom: 10px;
+}
+
 .callout.success {
   background: rgba(42, 106, 75, 0.12);
   color: var(--success);
@@ -371,18 +381,23 @@ a {
   margin-top: 12px;
 }
 
+.compact-actions {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
 .compact {
   margin: 0;
 }
 
 .scroll-area {
-  max-height: min(44vh, 360px);
+  max-height: min(38vh, 300px);
   overflow: auto;
   padding-right: 4px;
 }
 
 .scroll-area.tall {
-  max-height: min(52vh, 420px);
+  max-height: min(44vh, 340px);
 }
 
 .sub-tabs {
@@ -484,6 +499,59 @@ a {
   margin: 0;
 }
 
+.loading-indicator {
+  position: sticky;
+  top: 0;
+  z-index: 1300;
+  display: grid;
+  gap: 6px;
+  padding: calc(env(safe-area-inset-top) + 8px) 16px 8px;
+  background: rgba(249, 245, 238, 0.92);
+  backdrop-filter: blur(14px);
+}
+
+.loading-bar {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(17, 43, 31, 0.08);
+}
+
+.loading-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 34%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(17, 43, 31, 0.18), var(--accent), rgba(208, 138, 56, 0.85));
+  animation: loading-slide 1s ease-in-out infinite;
+}
+
+.loading-indicator p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.loading-state {
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-state::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: shimmer 1.2s linear infinite;
+}
+
+.helper-text {
+  margin: 10px 0 0;
+  font-size: 0.88rem;
+}
+
 .result-pill {
   display: inline-flex;
   align-items: center;
@@ -507,19 +575,20 @@ a {
 
 @media (max-width: 720px) {
   .app-shell {
-    padding: 16px;
+    padding: 10px 12px 14px;
   }
 
   .topbar {
     flex-direction: column;
+    gap: 10px;
   }
 
   .mobile-tabs {
     position: sticky;
-    top: 8px;
+    top: 6px;
     z-index: 20;
-    padding: 8px;
-    border-radius: 20px;
+    padding: 6px;
+    border-radius: 18px;
     background: rgba(255, 248, 239, 0.88);
     backdrop-filter: blur(18px);
   }
@@ -545,7 +614,7 @@ a {
   .modal-card {
     width: 100%;
     max-height: 88vh;
-    padding: 16px;
+    padding: 14px;
   }
 
   .resource-item {
@@ -555,5 +624,31 @@ a {
   .resource-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .scroll-area {
+    max-height: min(34vh, 240px);
+  }
+
+  .scroll-area.tall {
+    max-height: min(40vh, 300px);
+  }
+}
+
+@keyframes loading-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
   }
 }

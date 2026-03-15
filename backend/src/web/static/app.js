@@ -9,9 +9,16 @@ const state = {
   selectedAlertSymbol: "",
 };
 
+const loadingState = {
+  pending: 0,
+  message: "불러오는 중입니다...",
+};
+
 const elements = {
   loginPanel: document.getElementById("login-panel"),
   appPanel: document.getElementById("app-panel"),
+  loadingIndicator: document.getElementById("loading-indicator"),
+  loadingText: document.getElementById("loading-text"),
   loginForm: document.getElementById("login-form"),
   loginError: document.getElementById("login-error"),
   logoutButton: document.getElementById("logout-button"),
@@ -39,14 +46,22 @@ const elements = {
 };
 
 async function request(path, options = {}) {
-  const response = await fetch(path, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
+  const { loadingMessage = "불러오는 중입니다...", skipLoading = false, ...fetchOptions } = options;
+  beginLoading(loadingMessage, skipLoading);
+
+  let response;
+  try {
+    response = await fetch(path, {
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(fetchOptions.headers || {}),
+      },
+      ...fetchOptions,
+    });
+  } finally {
+    endLoading(skipLoading);
+  }
 
   if (response.status === 401) {
     showLoggedOut();
@@ -63,6 +78,113 @@ async function request(path, options = {}) {
     throw new Error(payload.detail || payload.message || "요청에 실패했습니다.");
   }
   return payload;
+}
+
+function beginLoading(message, skipLoading) {
+  if (skipLoading) {
+    return;
+  }
+  loadingState.pending += 1;
+  loadingState.message = message;
+  elements.loadingText.textContent = message;
+  elements.loadingIndicator.classList.remove("hidden");
+}
+
+function endLoading(skipLoading) {
+  if (skipLoading) {
+    return;
+  }
+  loadingState.pending = Math.max(loadingState.pending - 1, 0);
+  if (loadingState.pending === 0) {
+    elements.loadingIndicator.classList.add("hidden");
+    elements.loadingText.textContent = "불러오는 중입니다...";
+  }
+}
+
+function setFormBusy(form, busy, busyText = "처리 중...") {
+  form.querySelectorAll("button[type='submit']").forEach((button) => {
+    if (!button.dataset.defaultLabel) {
+      button.dataset.defaultLabel = button.textContent;
+    }
+    button.disabled = busy;
+    button.textContent = busy ? busyText : button.dataset.defaultLabel;
+  });
+}
+
+function setButtonBusy(button, busy, busyText = "처리 중...") {
+  if (!button) {
+    return;
+  }
+  if (!button.dataset.defaultLabel) {
+    button.dataset.defaultLabel = button.textContent;
+  }
+  button.disabled = busy;
+  button.textContent = busy ? busyText : button.dataset.defaultLabel;
+}
+
+async function withFormBusy(form, busyText, task) {
+  setFormBusy(form, true, busyText);
+  try {
+    return await task();
+  } finally {
+    setFormBusy(form, false, busyText);
+  }
+}
+
+async function withButtonBusy(button, busyText, task) {
+  setButtonBusy(button, true, busyText);
+  try {
+    return await task();
+  } finally {
+    setButtonBusy(button, false, busyText);
+  }
+}
+
+function formatPrice(value, currency = "KRW") {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "-";
+  }
+
+  if (currency === "USD") {
+    return `${numeric.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+  }
+
+  return `${numeric.toLocaleString("ko-KR")}원`;
+}
+
+function formatChangePercent(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "";
+  }
+  return `${numeric > 0 ? "+" : ""}${numeric.toFixed(2)}%`;
+}
+
+function showLoadingResult(target, message) {
+  target.innerHTML = `<li class="empty-state loading-state">${message}</li>`;
+}
+
+function showLoadingCard(target, message) {
+  target.innerHTML = `<div class="callout loading-state">${message}</div>`;
+}
+
+function submitOnEnter(event) {
+  if (event.key !== "Enter" || event.shiftKey) {
+    return;
+  }
+  const form = event.currentTarget.form;
+  if (!form) {
+    return;
+  }
+  event.preventDefault();
+  form.requestSubmit();
+}
+
+function setupEnterSubmit() {
+  document.querySelectorAll("input").forEach((input) => {
+    input.addEventListener("keydown", submitOnEnter);
+  });
 }
 
 function showToast(message, kind = "info") {
@@ -127,7 +249,7 @@ function renderWatchlist() {
         <li class="resource-item">
           <div class="resource-meta">
             <strong>${item.symbol}</strong>
-            <small>등록 ${toLocalDate(item.created_at)}</small>
+            <small>관심종목 등록 ${toLocalDate(item.created_at)}</small>
           </div>
           <div class="resource-actions">
             <button class="ghost-button small" type="button" data-action="open-alert-modal" data-symbol="${item.symbol}">알림</button>
@@ -208,12 +330,12 @@ function renderAll() {
 
 async function refreshData() {
   const [watchlist, stockAlerts, currencyAlerts, newsAlerts, notifications, unread] = await Promise.all([
-    request("/watchlist"),
-    request("/alerts/stocks"),
-    request("/alerts/currencies"),
-    request("/alerts/news"),
-    request("/notifications"),
-    request("/notifications/unread-count"),
+    request("/watchlist", { loadingMessage: "관심종목을 불러오는 중입니다..." }),
+    request("/alerts/stocks", { loadingMessage: "주식 알림을 불러오는 중입니다..." }),
+    request("/alerts/currencies", { loadingMessage: "환율 알림을 불러오는 중입니다..." }),
+    request("/alerts/news", { loadingMessage: "뉴스 알림을 불러오는 중입니다..." }),
+    request("/notifications", { loadingMessage: "알림 기록을 불러오는 중입니다..." }),
+    request("/notifications/unread-count", { loadingMessage: "읽지 않은 알림 수를 확인하는 중입니다..." }),
   ]);
 
   state.watchlist = watchlist;
@@ -241,7 +363,7 @@ function showLoggedOut() {
 
 async function bootstrap() {
   try {
-    await request("/session/me");
+    await request("/session/me", { loadingMessage: "세션을 확인하는 중입니다..." });
     showLoggedIn();
     await refreshData();
   } catch {
@@ -256,9 +378,12 @@ async function handleLogin(event) {
   const formData = new FormData(form);
 
   try {
-    await request("/session/login", {
-      method: "POST",
-      body: JSON.stringify({ password: formData.get("password") }),
+    await withFormBusy(form, "접속 중...", async () => {
+      await request("/session/login", {
+        method: "POST",
+        body: JSON.stringify({ password: formData.get("password") }),
+        loadingMessage: "로그인하는 중입니다...",
+      });
     });
     form.reset();
     showLoggedIn();
@@ -271,7 +396,9 @@ async function handleLogin(event) {
 }
 
 async function handleLogout() {
-  await request("/session/logout", { method: "POST" });
+  await withButtonBusy(elements.logoutButton, "로그아웃 중...", async () => {
+    await request("/session/logout", { method: "POST", loadingMessage: "로그아웃하는 중입니다..." });
+  });
   showLoggedOut();
   showToast("로그아웃되었습니다.", "info");
 }
@@ -326,8 +453,8 @@ function renderStockSearchResults(results) {
         <li class="resource-item">
           <div class="resource-meta">
             <strong>${item.symbol} · ${item.name}</strong>
-            <small>${item.price} ${item.currency || ""}</small>
-            <small>${item.source}</small>
+            <small>${item.market || "-"} · ${formatPrice(item.price, item.currency || "KRW")}</small>
+            <small>${formatChangePercent(item.change_percent)} · ${item.source}</small>
           </div>
           <div class="resource-actions">
             <button class="primary-button small-button" type="button" data-action="add-watchlist-symbol" data-symbol="${item.symbol}">관심종목 추가</button>
@@ -343,48 +470,69 @@ async function handleStockAlertSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
-  await request("/alerts/stocks", {
-    method: "POST",
-    body: JSON.stringify({
-      stock_symbol: formData.get("stock_symbol"),
-      target_price: Number(formData.get("target_price")),
-      condition: formData.get("condition"),
-    }),
-  });
-  form.reset();
-  await refreshData();
-  showToast("주식 알림을 추가했습니다.", "success");
+  try {
+    await withFormBusy(form, "추가 중...", async () => {
+      await request("/alerts/stocks", {
+        method: "POST",
+        body: JSON.stringify({
+          stock_symbol: formData.get("stock_symbol"),
+          target_price: Number(formData.get("target_price")),
+          condition: formData.get("condition"),
+        }),
+        loadingMessage: "주식 알림을 추가하는 중입니다...",
+      });
+    });
+    form.reset();
+    await refreshData();
+    showToast("주식 알림을 추가했습니다.", "success");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
 }
 
 async function handleCurrencyAlertSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
-  await request("/alerts/currencies", {
-    method: "POST",
-    body: JSON.stringify({
-      base_currency: formData.get("base_currency"),
-      target_currency: formData.get("target_currency"),
-      target_rate: Number(formData.get("target_rate")),
-      condition: formData.get("condition"),
-    }),
-  });
-  form.reset();
-  await refreshData();
-  showToast("환율 알림을 추가했습니다.", "success");
+  try {
+    await withFormBusy(form, "추가 중...", async () => {
+      await request("/alerts/currencies", {
+        method: "POST",
+        body: JSON.stringify({
+          base_currency: formData.get("base_currency"),
+          target_currency: formData.get("target_currency"),
+          target_rate: Number(formData.get("target_rate")),
+          condition: formData.get("condition"),
+        }),
+        loadingMessage: "환율 알림을 추가하는 중입니다...",
+      });
+    });
+    form.reset();
+    await refreshData();
+    showToast("환율 알림을 추가했습니다.", "success");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
 }
 
 async function handleNewsAlertSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
-  await request("/alerts/news", {
-    method: "POST",
-    body: JSON.stringify({ keywords: formData.get("keywords") }),
-  });
-  form.reset();
-  await refreshData();
-  showToast("뉴스 알림을 추가했습니다.", "success");
+  try {
+    await withFormBusy(form, "추가 중...", async () => {
+      await request("/alerts/news", {
+        method: "POST",
+        body: JSON.stringify({ keywords: formData.get("keywords") }),
+        loadingMessage: "뉴스 알림을 추가하는 중입니다...",
+      });
+    });
+    form.reset();
+    await refreshData();
+    showToast("뉴스 알림을 추가했습니다.", "success");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
 }
 
 async function handleStockSearch(event) {
@@ -392,8 +540,18 @@ async function handleStockSearch(event) {
   const form = event.currentTarget;
   const formData = new FormData(form);
   const query = formData.get("query");
-  const payload = await request(`/stocks/search?query=${encodeURIComponent(query)}`);
-  renderStockSearchResults(payload.results || []);
+  showLoadingResult(elements.stockSearchResults, "종목을 조회하는 중입니다...");
+  try {
+    await withFormBusy(form, "조회 중...", async () => {
+      const payload = await request(`/stocks/search?query=${encodeURIComponent(query)}`, {
+        loadingMessage: "종목을 검색하는 중입니다...",
+      });
+      renderStockSearchResults(payload.results || []);
+    });
+  } catch (error) {
+    elements.stockSearchResults.innerHTML = `<li class="empty-state">${error.message}</li>`;
+    showToast(error.message, "error");
+  }
 }
 
 async function handleFxLookup(event) {
@@ -402,13 +560,23 @@ async function handleFxLookup(event) {
   const formData = new FormData(form);
   const base = String(formData.get("base")).toUpperCase();
   const target = String(formData.get("target")).toUpperCase();
-  const payload = await request(`/currency/rate?base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`);
-  elements.fxResult.innerHTML = `
-    <div class="stat-card">
-      <small>${payload.source}</small>
-      <strong>${payload.base_currency}/${payload.target_currency} ${payload.rate}</strong>
-    </div>
-  `;
+  showLoadingCard(elements.fxResult, "환율을 조회하는 중입니다...");
+  try {
+    await withFormBusy(form, "조회 중...", async () => {
+      const payload = await request(`/currency/rate?base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`, {
+        loadingMessage: "환율을 조회하는 중입니다...",
+      });
+      elements.fxResult.innerHTML = `
+        <div class="stat-card">
+          <small>${payload.source}</small>
+          <strong>${payload.base_currency}/${payload.target_currency} ${payload.rate}</strong>
+        </div>
+      `;
+    });
+  } catch (error) {
+    showLoadingCard(elements.fxResult, error.message);
+    showToast(error.message, "error");
+  }
 }
 
 async function handleNewsSearch(event) {
@@ -417,59 +585,81 @@ async function handleNewsSearch(event) {
   const formData = new FormData(form);
   const query = formData.get("query");
   const qs = query ? `?query=${encodeURIComponent(query)}` : "";
-  const payload = await request(`/news${qs}`);
-  if (!payload.length) {
-    elements.newsResults.innerHTML = `<li class="empty-state">뉴스가 없습니다.</li>`;
-    return;
+  showLoadingResult(elements.newsResults, "뉴스를 불러오는 중입니다...");
+  try {
+    await withFormBusy(form, "조회 중...", async () => {
+      const payload = await request(`/news${qs}`, { loadingMessage: "뉴스를 불러오는 중입니다..." });
+      if (!payload.length) {
+        elements.newsResults.innerHTML = `<li class="empty-state">뉴스가 없습니다.</li>`;
+        return;
+      }
+      elements.newsResults.innerHTML = payload
+        .map(
+          (item) => `
+            <li class="news-item">
+              <strong>${item.title}</strong>
+              <small>${item.source} · ${item.published}</small>
+              <p class="muted">${item.summary}</p>
+              <a class="result-pill" href="${item.url}" target="_blank" rel="noreferrer">원문 보기</a>
+            </li>
+          `
+        )
+        .join("");
+    });
+  } catch (error) {
+    elements.newsResults.innerHTML = `<li class="empty-state">${error.message}</li>`;
+    showToast(error.message, "error");
   }
-  elements.newsResults.innerHTML = payload
-    .map(
-      (item) => `
-        <li class="news-item">
-          <strong>${item.title}</strong>
-          <small>${item.source} · ${item.published}</small>
-          <p class="muted">${item.summary}</p>
-          <a class="result-pill" href="${item.url}" target="_blank" rel="noreferrer">원문 보기</a>
-        </li>
-      `
-    )
-    .join("");
 }
 
 async function handleQuickStockAlertSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
-  await request("/alerts/stocks", {
-    method: "POST",
-    body: JSON.stringify({
-      stock_symbol: formData.get("stock_symbol"),
-      target_price: Number(formData.get("target_price")),
-      condition: formData.get("condition"),
-    }),
-  });
-  form.reset();
-  closeAlertModal();
-  await refreshData();
-  setView("alerts");
-  setAlertView("stocks");
-  showToast("주식 알림을 추가했습니다.", "success");
+  try {
+    await withFormBusy(form, "추가 중...", async () => {
+      await request("/alerts/stocks", {
+        method: "POST",
+        body: JSON.stringify({
+          stock_symbol: formData.get("stock_symbol"),
+          target_price: Number(formData.get("target_price")),
+          condition: formData.get("condition"),
+        }),
+        loadingMessage: "주식 알림을 추가하는 중입니다...",
+      });
+    });
+    form.reset();
+    closeAlertModal();
+    await refreshData();
+    setView("alerts");
+    setAlertView("stocks");
+    showToast("주식 알림을 추가했습니다.", "success");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
 }
 
 async function handleQuickNewsAlertSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
-  await request("/alerts/news", {
-    method: "POST",
-    body: JSON.stringify({ keywords: formData.get("keywords") }),
-  });
-  form.reset();
-  closeAlertModal();
-  await refreshData();
-  setView("alerts");
-  setAlertView("news");
-  showToast("뉴스 알림을 추가했습니다.", "success");
+  try {
+    await withFormBusy(form, "추가 중...", async () => {
+      await request("/alerts/news", {
+        method: "POST",
+        body: JSON.stringify({ keywords: formData.get("keywords") }),
+        loadingMessage: "뉴스 알림을 추가하는 중입니다...",
+      });
+    });
+    form.reset();
+    closeAlertModal();
+    await refreshData();
+    setView("alerts");
+    setAlertView("news");
+    showToast("뉴스 알림을 추가했습니다.", "success");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
 }
 
 function setAlertView(name) {
@@ -482,7 +672,8 @@ function setAlertView(name) {
 }
 
 async function handleListActions(event) {
-  const action = event.target.dataset.action;
+  const trigger = event.target.closest("[data-action]");
+  const action = trigger?.dataset.action;
   if (!action) {
     return;
   }
@@ -497,34 +688,70 @@ async function handleListActions(event) {
     } else if (action === "go-to-alerts") {
       setView("alerts");
       return;
+    } else if (action === "go-to-watchlist") {
+      closeAlertModal();
+      setView("watchlist");
+      return;
+    } else if (action === "go-to-currency-alert") {
+      setView("alerts");
+      setAlertView("currencies");
+      return;
     } else if (action === "open-alert-modal") {
-      openAlertModal(event.target.dataset.symbol);
+      openAlertModal(trigger.dataset.symbol);
       return;
     } else if (action === "close-alert-modal") {
       closeAlertModal();
       return;
     } else if (action === "add-watchlist-symbol") {
-      await request("/watchlist", {
-        method: "POST",
-        body: JSON.stringify({ symbol: event.target.dataset.symbol }),
+      await withButtonBusy(trigger, "추가 중...", async () => {
+        await request("/watchlist", {
+          method: "POST",
+          body: JSON.stringify({ symbol: trigger.dataset.symbol }),
+          loadingMessage: "관심종목에 추가하는 중입니다...",
+        });
       });
       closeStockSearchModal();
       setView("watchlist");
       showToast("관심종목을 추가했습니다.", "success");
     } else if (action === "delete-watchlist") {
-      await request(`/watchlist/${event.target.dataset.symbol}`, { method: "DELETE" });
+      await withButtonBusy(trigger, "삭제 중...", async () => {
+        await request(`/watchlist/${trigger.dataset.symbol}`, {
+          method: "DELETE",
+          loadingMessage: "관심종목을 삭제하는 중입니다...",
+        });
+      });
       showToast("관심종목을 삭제했습니다.", "info");
     } else if (action === "delete-stock-alert") {
-      await request(`/alerts/stocks/${event.target.dataset.id}`, { method: "DELETE" });
+      await withButtonBusy(trigger, "삭제 중...", async () => {
+        await request(`/alerts/stocks/${trigger.dataset.id}`, {
+          method: "DELETE",
+          loadingMessage: "주식 알림을 삭제하는 중입니다...",
+        });
+      });
       showToast("주식 알림을 삭제했습니다.", "info");
     } else if (action === "delete-currency-alert") {
-      await request(`/alerts/currencies/${event.target.dataset.id}`, { method: "DELETE" });
+      await withButtonBusy(trigger, "삭제 중...", async () => {
+        await request(`/alerts/currencies/${trigger.dataset.id}`, {
+          method: "DELETE",
+          loadingMessage: "환율 알림을 삭제하는 중입니다...",
+        });
+      });
       showToast("환율 알림을 삭제했습니다.", "info");
     } else if (action === "delete-news-alert") {
-      await request(`/alerts/news/${event.target.dataset.id}`, { method: "DELETE" });
+      await withButtonBusy(trigger, "삭제 중...", async () => {
+        await request(`/alerts/news/${trigger.dataset.id}`, {
+          method: "DELETE",
+          loadingMessage: "뉴스 알림을 삭제하는 중입니다...",
+        });
+      });
       showToast("뉴스 알림을 삭제했습니다.", "info");
     } else if (action === "read-notification") {
-      await request(`/notifications/${event.target.dataset.id}/read`, { method: "PATCH" });
+      await withButtonBusy(trigger, "처리 중...", async () => {
+        await request(`/notifications/${trigger.dataset.id}/read`, {
+          method: "PATCH",
+          loadingMessage: "알림을 읽음 처리하는 중입니다...",
+        });
+      });
       showToast("알림을 읽음 처리했습니다.", "success");
     }
     await refreshData();
@@ -576,7 +803,6 @@ function setupServiceWorker() {
   }
 }
 
-document.getElementById("stock-alert-form").addEventListener("submit", handleStockAlertSubmit);
 document.getElementById("currency-alert-form").addEventListener("submit", handleCurrencyAlertSubmit);
 document.getElementById("news-alert-form").addEventListener("submit", handleNewsAlertSubmit);
 document.getElementById("stock-search-form").addEventListener("submit", handleStockSearch);
@@ -591,11 +817,14 @@ elements.loginForm.addEventListener("submit", handleLogin);
 elements.logoutButton.addEventListener("click", handleLogout);
 elements.settingsLogoutButton.addEventListener("click", handleLogout);
 elements.refreshDashboard.addEventListener("click", async () => {
-  await refreshData();
+  await withButtonBusy(elements.refreshDashboard, "새로고침 중...", async () => {
+    await refreshData();
+  });
   showToast("데이터를 새로고침했습니다.", "success");
 });
 
 setupRouting();
 setupPwaInstall();
 setupServiceWorker();
+setupEnterSubmit();
 bootstrap();

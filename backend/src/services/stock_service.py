@@ -20,6 +20,7 @@ class StockService:
                 {
                     "symbol": str(item.get("symbol") or item.get("code") or query).upper(),
                     "name": str(item.get("name") or item.get("stock_name") or query),
+                    "market": item.get("market"),
                     "price": price,
                     "change": self._coerce_float(item.get("change")),
                     "change_percent": self._coerce_float(

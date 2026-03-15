@@ -37,7 +37,7 @@ class NaverStockService:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                 'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Encoding': 'gzip, deflate',
                 'Connection': 'keep-alive',
                 'Referer': 'https://finance.naver.com/'
             },
@@ -45,7 +45,7 @@ class NaverStockService:
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Encoding': 'gzip, deflate',
                 'Connection': 'keep-alive',
                 'Referer': 'https://www.google.com/'
             },
@@ -61,7 +61,7 @@ class NaverStockService:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/120.0',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language': 'ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3',
-                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Encoding': 'gzip, deflate',
                 'Connection': 'keep-alive',
                 'Referer': 'https://finance.naver.com/'
             },
@@ -69,7 +69,7 @@ class NaverStockService:
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/119.0',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.5',
-                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Encoding': 'gzip, deflate',
                 'Connection': 'keep-alive',
                 'Referer': 'https://www.naver.com/'
             }
@@ -131,10 +131,7 @@ class NaverStockService:
         """메인 검색 함수 - 한국 우선 → 해외 fallback"""
         try:
             self.logger.info(f"🔍 통합 주식 검색 시작: {query}")
-            
-            # 요청 간 지연 추가 (403 에러 방지)
-            self._add_random_delay()
-            
+
             # 캐시 키 생성
             cache_key = self._get_cache_key(query)
             cached_result = self._get_from_cache(cache_key)
@@ -187,6 +184,10 @@ class NaverStockService:
             
             html_content = response.text
             results = []
+
+            card_result = self._parse_stock_card_from_search_page(html_content, query)
+            if card_result:
+                return [card_result]
             
             # 2. 네이버 검색 결과에서 종목코드 동적 추출
             korean_codes = re.findall(r'finance\.naver\.com/item/main\.naver\?code=(\d{6})', html_content)
@@ -210,177 +211,123 @@ class NaverStockService:
             self.logger.error(f"❌ 네이버 검색 오류: {e}")
             return []
 
+    def _parse_numeric_value(self, value: str) -> Optional[float]:
+        """문자열에서 숫자 값을 안전하게 추출"""
+        cleaned = re.sub(r"[^\d.\-]", "", value.replace(",", ""))
+        if not cleaned or cleaned in {"-", ".", "-."}:
+            return None
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+
+    def _parse_percent_value(self, value: str) -> Optional[float]:
+        """퍼센트 문자열 파싱"""
+        numeric = self._parse_numeric_value(value.replace("%", ""))
+        if numeric is None:
+            return None
+        return numeric
+
+    def _extract_search_card_symbol(self, card: BeautifulSoup, query: str) -> str:
+        """검색 카드에서 종목 코드를 추출"""
+        card_html = str(card)
+
+        korean_match = re.search(r"finance\.naver\.com/item/main\.naver\?code=(\d{6})", card_html)
+        if korean_match:
+            return korean_match.group(1)
+
+        world_match = re.search(r"worldstock/stock/([A-Z.]+)", card_html)
+        if world_match:
+            return world_match.group(1).split(".")[0]
+
+        market_text = card.select_one(".spt_tlt .t_nm")
+        if market_text:
+            symbol_match = re.search(r"\b([A-Z]{1,5}(?:\.[A-Z])?)\b", market_text.get_text(" ", strip=True))
+            if symbol_match:
+                return symbol_match.group(1).split(".")[0]
+
+        if re.fullmatch(r"\d{6}", query):
+            return query
+        return query.upper()
+
+    def _extract_search_card_market(self, card: BeautifulSoup, symbol: str, currency: str) -> str:
+        """검색 카드에서 시장 정보를 추출"""
+        market_elem = card.select_one(".spt_tlt .t_nm")
+        market_text = market_elem.get_text(" ", strip=True).upper() if market_elem else ""
+
+        for known_market in ("KOSPI", "KOSDAQ", "NASDAQ", "NYSE", "AMEX"):
+            if known_market in market_text:
+                return known_market
+
+        if currency == "USD":
+            return self._determine_world_market(symbol)
+        return "KOSPI"
+
+    def _parse_stock_card_from_search_page(self, html_content: str, query: str) -> Optional[Dict]:
+        """네이버 검색 결과 카드에서 주식 정보를 우선 파싱"""
+        try:
+            soup = BeautifulSoup(html_content, "html.parser")
+            card = soup.select_one(".cs_stock")
+            if not card:
+                return None
+
+            price_elem = card.select_one(".stock_quote .spt_con strong") or card.select_one(".stock_quote strong")
+            if not price_elem:
+                return None
+
+            current_price = self._parse_numeric_value(price_elem.get_text(" ", strip=True))
+            if current_price is None:
+                return None
+
+            name_elem = card.select_one(".spt_tlt .item")
+            stock_name = name_elem.get_text(" ", strip=True) if name_elem else query
+
+            unit_elem = card.select_one(".stock_quote .spt_con .unit")
+            unit_text = unit_elem.get_text(" ", strip=True).upper() if unit_elem else ""
+            currency = "USD" if "USD" in unit_text else "KRW"
+
+            symbol = self._extract_search_card_symbol(card, query)
+            market = self._extract_search_card_market(card, symbol, currency)
+
+            change_percent = 0.0
+            for change_elem in card.select(".stock_quote .n_ch em, .stock_quote em"):
+                change_text = change_elem.get_text(" ", strip=True)
+                if "%" not in change_text:
+                    continue
+                parsed_change = self._parse_percent_value(change_text)
+                if parsed_change is not None:
+                    change_percent = parsed_change
+                    break
+
+            result = {
+                "symbol": symbol,
+                "name": stock_name,
+                "name_kr": stock_name,
+                "market": market,
+                "current_price": current_price,
+                "change_percent": change_percent,
+                "timestamp": None,
+                "source": "naver_search_card",
+                "currency": currency,
+            }
+
+            self.logger.info(
+                f"✅ 검색 카드 파싱 성공: {stock_name} ({symbol}) - {current_price} {currency}"
+            )
+            return result
+
+        except Exception as e:
+            self.logger.error(f"❌ 검색 카드 파싱 오류: {e}")
+            return None
+
     def _parse_world_stock_from_search_page(self, html_content: str, query: str) -> Optional[Dict]:
         """네이버 검색 결과 페이지에서 해외 주식 정보 직접 파싱"""
         try:
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(html_content, 'html.parser')
-            
-            # 주가 정보가 포함된 패턴들 찾기
-            # 예: "엔비디아 $157.75 전일대비 상승 $2.66 (+1.72%)" 같은 패턴
-            
-            # 해외 주식 가격 파싱 (개선된 방식)
-            current_price = None
-            change_percent = None
-            stock_name = query  # 기본값은 검색어
-            
-            # 1단계: HTML 구조 기반 구체적인 패턴 (우선순위 높음)
-            html_price_patterns = [
-                r'<strong>(\d+\.\d+)</strong>',  # 주가 전용 strong 태그
-                r'spt_con[^>]*>.*?<strong>(\d+\.\d+)</strong>',  # 주식 정보 컨테이너 내 strong 태그
-                r'class="price[^"]*"[^>]*>(\d+\.\d+)',  # price 클래스
-            ]
-            
-            # HTML 패턴으로 먼저 시도
-            for pattern in html_price_patterns:
-                matches = re.findall(pattern, html_content, re.IGNORECASE | re.DOTALL)
-                for match in matches:
-                    try:
-                        price = float(match)
-                        if price_config.WORLD_STOCK_MIN_PRICE <= price <= price_config.WORLD_STOCK_MAX_PRICE:
-                            current_price = price
-                            self.logger.info(f"✅ HTML 패턴에서 해외 주식 가격 발견: ${current_price:.2f} (패턴: {pattern})")
-                            break
-                    except (ValueError, TypeError):
-                        continue
-                if current_price:
-                    break
-            
-            # 2단계: HTML 패턴으로 찾지 못한 경우 컨텍스트 기반 패턴 시도
-            if not current_price:
-                context_patterns = [
-                    r'주가[^0-9]*(\d{1,4}\.\d{1,2})',  # '주가' 키워드 후 숫자
-                    r'현재가[^0-9]*(\d{1,4}\.\d{1,2})',  # '현재가' 키워드 후 숫자
-                    r'종가[^0-9]*(\d{1,4}\.\d{1,2})',  # '종가' 키워드 후 숫자
-                ]
-                
-                for pattern in context_patterns:
-                    matches = re.findall(pattern, html_content, re.IGNORECASE)
-                    for match in matches:
-                        try:
-                            price = float(match)
-                            if price_config.WORLD_STOCK_MIN_PRICE <= price <= price_config.WORLD_STOCK_MAX_PRICE:
-                                current_price = price
-                                self.logger.info(f"✅ 컨텍스트 패턴에서 해외 주식 가격 발견: ${current_price:.2f} (패턴: {pattern})")
-                                break
-                        except (ValueError, TypeError):
-                            continue
-                    if current_price:
-                        break
-            
-            # 3단계: 마지막 fallback으로 기존 일반 패턴 사용
-            if not current_price:
-                fallback_patterns = [
-                    r'\$(\d{1,4}\.\d{1,2})',
-                    r'(\d{1,4}\.\d{1,2})\s*달러',
-                    r'(\d{1,4}\.\d{1,2})\s*USD',
-                ]
-                
-                for pattern in fallback_patterns:
-                    matches = re.findall(pattern, html_content, re.IGNORECASE)
-                    for match in matches:
-                        try:
-                            price = float(match)
-                            if price_config.WORLD_STOCK_MIN_PRICE <= price <= price_config.WORLD_STOCK_MAX_PRICE:
-                                current_price = price
-                                self.logger.info(f"✅ Fallback 패턴에서 해외 주식 가격 발견: ${current_price:.2f} (패턴: {pattern})")
-                                break
-                        except (ValueError, TypeError):
-                            continue
-                    if current_price:
-                        break
-            
-            # 변동률 파싱 (개선된 방식)
-            if change_percent is None:
-                # 1단계: HTML 구조 기반 구체적인 패턴 (우선순위 높음)
-                html_change_patterns = [
-                    r'<em>\(([+-]?\d+\.\d{1,2})%\)</em>',  # 네이버 HTML 구조의 변동률
-                    r'n_ch[^>]*>.*?<em>\(([+-]?\d+\.\d{1,2})%\)</em>',  # 변동 정보 컨테이너 내
-                    r'전일대비.*?<em>\(([+-]?\d+\.\d{1,2})%\)</em>',  # 전일대비 컨텍스트
-                    r'상승.*?<em>\(([+-]?\d+\.\d{1,2})%\)</em>',  # 상승 컨텍스트
-                    r'하락.*?<em>\(([+-]?\d+\.\d{1,2})%\)</em>',  # 하락 컨텍스트
-                ]
-                
-                # HTML 패턴으로 먼저 시도
-                for pattern in html_change_patterns:
-                    matches = re.findall(pattern, html_content, re.IGNORECASE | re.DOTALL)
-                    for match in matches:
-                        try:
-                            change = float(match)
-                            if -20 <= change <= 20:  # 합리적인 일일 변동률 범위
-                                change_percent = change
-                                self.logger.info(f"✅ HTML 패턴에서 해외 주식 변동률 발견: {change_percent}% (패턴: {pattern})")
-                                break
-                        except (ValueError, TypeError):
-                            continue
-                    if change_percent is not None:
-                        break
-                
-                # 2단계: HTML 패턴으로 찾지 못한 경우 컨텍스트 기반 패턴 시도
-                if change_percent is None:
-                    context_change_patterns = [
-                        r'변동률[^0-9]*([+-]?\d+\.\d{1,2})%',  # '변동률' 키워드 후
-                        r'등락률[^0-9]*([+-]?\d+\.\d{1,2})%',  # '등락률' 키워드 후
-                        r'전일대비[^0-9]*([+-]?\d+\.\d{1,2})%',  # '전일대비' 키워드 후
-                    ]
-                    
-                    for pattern in context_change_patterns:
-                        matches = re.findall(pattern, html_content, re.IGNORECASE)
-                        for match in matches:
-                            try:
-                                change = float(match)
-                                if -20 <= change <= 20:
-                                    change_percent = change
-                                    self.logger.info(f"✅ 컨텍스트 패턴에서 해외 주식 변동률 발견: {change_percent}% (패턴: {pattern})")
-                                    break
-                            except (ValueError, TypeError):
-                                continue
-                        if change_percent is not None:
-                            break
-                
-                # 3단계: 마지막 fallback으로 일반 패턴 사용
-                if change_percent is None:
-                    fallback_change_patterns = [
-                        r'\(([+-]?\d+\.\d{1,2})%\)',  # 괄호 안의 변동률
-                        r'([+-]?\d+\.\d{1,2})%',      # 일반적인 퍼센트
-                    ]
-                    
-                    for pattern in fallback_change_patterns:
-                        matches = re.findall(pattern, html_content, re.IGNORECASE)
-                        for match in matches:
-                            try:
-                                change = float(match)
-                                if -20 <= change <= 20:
-                                    change_percent = change
-                                    self.logger.info(f"✅ Fallback 패턴에서 해외 주식 변동률 발견: {change_percent}% (패턴: {pattern})")
-                                    break
-                            except (ValueError, TypeError):
-                                continue
-                        if change_percent is not None:
-                            break
-            
-            # 해외 주식 심볼 추출 (기존 로직)
-            world_symbols = re.findall(r'worldstock/stock/([A-Z\.]+)', html_content)
-            symbol = world_symbols[0].split('.')[0] if world_symbols else query.upper()
-            
-            if current_price:
-                result = {
-                    'symbol': symbol,
-                    'name': stock_name,
-                    'name_kr': stock_name,
-                    'market': self._determine_world_market(symbol),
-                    'current_price': current_price,
-                    'change_percent': change_percent if change_percent is not None else 0.0,
-                    'timestamp': None,
-                    'source': 'naver_search_direct_parsing'
-                }
-                
-                self.logger.info(f"✅ 네이버 검색 결과에서 해외 주식 파싱 성공: {stock_name} ({symbol}) - ${current_price:.2f} ({change_percent}%)")
-                return result
-            
+            parsed = self._parse_stock_card_from_search_page(html_content, query)
+            if parsed and parsed.get("currency") == "USD":
+                return parsed
             self.logger.warning(f"⚠️ 네이버 검색 결과에서 해외 주식 정보를 찾을 수 없음: {query}")
             return None
-            
         except Exception as e:
             self.logger.error(f"❌ 네이버 검색 결과 파싱 오류: {e}")
             return None
