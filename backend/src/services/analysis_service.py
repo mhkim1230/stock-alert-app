@@ -6,6 +6,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 
 from src.config.settings import settings
+from src.services.market_context_service import MarketContextService
 from src.services.news_service import NewsService
 from src.services.stock_service import StockService
 
@@ -15,6 +16,7 @@ class AnalysisService:
         self.logger = logging.getLogger(__name__)
         self.news_service = NewsService()
         self.stock_service = StockService()
+        self.market_context_service = MarketContextService(self.news_service)
 
     async def get_stock_analysis(self, symbol: str, market: Optional[str] = None, period: str = "short") -> Optional[Dict]:
         quote = await self.stock_service.get_stock_quote(symbol)
@@ -35,7 +37,11 @@ class AnalysisService:
             investor_flow = await self._fetch_investor_flow(symbol)
         else:
             investor_flow = self._build_global_flow(history)
-        news_context = await self._build_news_context(symbol=symbol.upper(), name=stock_name, asset_type="stock")
+        news_context = await self.market_context_service.build_context(
+            asset_type="stock",
+            symbol=symbol.upper(),
+            name=stock_name,
+        )
         return self._build_analysis(
             history=history,
             asset_type="stock",
@@ -59,10 +65,10 @@ class AnalysisService:
         )
         if not history:
             return None
-        news_context = await self._build_news_context(
+        news_context = await self.market_context_service.build_context(
+            asset_type="currency",
             symbol=f"{base.upper()}/{target.upper()}",
             name=f"{base.upper()}/{target.upper()}",
-            asset_type="currency",
         )
         return self._build_analysis(
             history=history,
@@ -490,8 +496,18 @@ class AnalysisService:
             bollinger=bollinger,
             macd_metrics=macd_metrics,
         )
+        market_context_score = int(news_context.get("market_context_score") or 0)
+        market_context_summary = str(news_context.get("market_context_summary") or "")
+        macro_reasons = list(news_context.get("macro_reasons") or [])
+        news_reasons = list(news_context.get("news_reasons") or [])
 
-        final_score = max(0, min(100, trend_score + momentum_score + volume_score + volatility_score - risk_penalty))
+        final_score = max(
+            0,
+            min(
+                100,
+                trend_score + momentum_score + volume_score + volatility_score + market_context_score - risk_penalty,
+            ),
+        )
         if final_score >= 60:
             final_action = "매수"
         elif final_score <= 30:
@@ -512,12 +528,14 @@ class AnalysisService:
             trend_reasons=trend_reasons,
             momentum_reasons=momentum_reasons,
             volume_reasons=volume_reasons,
+            macro_reasons=macro_reasons,
+            news_reasons=news_reasons,
             risk_reasons=risk_reasons,
         )
         decision_summary = (
             f"최종 점수 {final_score}점으로 {final_action} 판단입니다. "
-            f"추세 {trend_score}점, 모멘텀 {momentum_score}점, 거래량 {volume_score}점, 변동성 {volatility_score}점에 "
-            f"위험 차감 {risk_penalty}점을 반영했습니다."
+            f"추세 {trend_score}점, 모멘텀 {momentum_score}점, 거래량 {volume_score}점, 변동성 {volatility_score}점, "
+            f"시장환경 {market_context_score}점에 위험 차감 {risk_penalty}점을 반영했습니다."
         )
         trend_summary = self._join_reason_summary(
             trend_reasons,
@@ -556,11 +574,11 @@ class AnalysisService:
             fallback="현재 구간에서는 가격 기준점을 지키는지 확인하면서 대응 강도를 조절하는 편이 좋습니다.",
         )
         buy_plan = self._join_reason_summary(
-            trend_reasons[:2] + momentum_reasons[:1],
+            trend_reasons[:2] + momentum_reasons[:1] + news_reasons[:1],
             fallback=f"1차 매수는 {self._fmt(first_buy, price_unit, asset_type)}, 2차 매수는 {self._fmt(second_buy, price_unit, asset_type)}입니다.",
         )
         sell_plan = self._join_reason_summary(
-            volume_reasons[:1] + risk_reasons[:2],
+            volume_reasons[:1] + risk_reasons[:2] + macro_reasons[:1],
             fallback=f"1차 매도는 {self._fmt(first_sell, price_unit, asset_type)}, 2차 매도는 {self._fmt(second_sell, price_unit, asset_type)}입니다.",
         )
         loss_cut_plan = f"손절 기준은 {self._fmt(stop_loss, price_unit, asset_type)} 이탈 여부입니다."
@@ -586,6 +604,7 @@ class AnalysisService:
             "momentum_score": momentum_score,
             "volume_score": volume_score,
             "volatility_score": volatility_score,
+            "market_context_score": market_context_score,
             "risk_penalty": risk_penalty,
             "summary_title": summary_title,
             "summary_body": summary_body,
@@ -599,12 +618,15 @@ class AnalysisService:
             "timing_summary": timing_summary,
             "volume_summary": volume_summary,
             "volatility_summary": volatility_summary,
+            "market_context_summary": market_context_summary,
             "price_reference_summary": price_reference_summary,
             "decision_reasons": decision_reasons,
             "trend_reasons": trend_reasons,
             "momentum_reasons": momentum_reasons,
             "volume_reasons": volume_reasons,
             "volatility_reasons": volatility_reasons,
+            "macro_reasons": macro_reasons,
+            "news_reasons": news_reasons,
             "risk_reasons": risk_reasons,
             "investor_summary": investor_summary,
             "news_brief": news_brief,
@@ -1170,13 +1192,15 @@ class AnalysisService:
         trend_reasons: List[str],
         momentum_reasons: List[str],
         volume_reasons: List[str],
+        macro_reasons: List[str],
+        news_reasons: List[str],
         risk_reasons: List[str],
     ) -> List[str]:
         if final_action == "매수":
-            return (trend_reasons[:2] + momentum_reasons[:1] + volume_reasons[:1])[:4]
+            return (trend_reasons[:2] + momentum_reasons[:1] + volume_reasons[:1] + news_reasons[:1])[:5]
         if final_action == "매도":
-            return (risk_reasons[:3] + trend_reasons[:1])[:4]
-        return (trend_reasons[:1] + momentum_reasons[:1] + risk_reasons[:2])[:4]
+            return (risk_reasons[:3] + macro_reasons[:1] + trend_reasons[:1])[:5]
+        return (trend_reasons[:1] + momentum_reasons[:1] + macro_reasons[:1] + risk_reasons[:2])[:5]
 
     @staticmethod
     def _calculate_rsi(closes: List[float], period: int) -> Optional[float]:
@@ -1339,30 +1363,30 @@ class AnalysisService:
     @staticmethod
     def _extract_macro_signals(articles: List[Dict[str, str]], asset_type: str) -> List[Dict[str, int]]:
         keyword_scores = {
-            "rate": ("금리 경계", -1),
-            "inflation": ("물가 부담", -1),
-            "tariff": ("관세 이슈", -1),
-            "war": ("지정학 불안", -2),
-            "attack": ("지정학 불안", -2),
-            "missile": ("지정학 불안", -2),
-            "drone": ("지정학 불안", -2),
-            "conflict": ("지정학 불안", -2),
-            "ceasefire": ("중동 긴장", -1),
-            "ukraine": ("우크라이나 전쟁", -2),
-            "russia": ("우크라이나 전쟁", -2),
-            "gaza": ("중동 전쟁", -2),
-            "israel": ("중동 전쟁", -2),
-            "iran": ("미국-이란 긴장", -2),
-            "red sea": ("중동 긴장", -2),
-            "sanction": ("제재 리스크", -1),
-            "oil": ("유가 변동성", -1 if asset_type == "stock" else 0),
-            "fed": ("미국 통화정책 경계", -1),
-            "treasury": ("국채금리 변동성", -1),
-            "stimulus": ("경기부양 기대", 1),
-            "ai": ("인공지능 수요 기대", 1),
-            "chip": ("반도체 수요 기대", 1),
-            "soft landing": ("연착륙 기대", 1),
-            "cut": ("정책 완화 기대", 1),
+            "rate": ("금리", -1),
+            "inflation": ("물가", -1),
+            "tariff": ("관세", -1),
+            "war": ("지정학", -2),
+            "attack": ("지정학", -2),
+            "missile": ("지정학", -2),
+            "drone": ("지정학", -2),
+            "conflict": ("지정학", -2),
+            "ceasefire": ("지정학", -1),
+            "ukraine": ("지정학", -2),
+            "russia": ("지정학", -2),
+            "gaza": ("지정학", -2),
+            "israel": ("지정학", -2),
+            "iran": ("지정학", -2),
+            "red sea": ("지정학", -2),
+            "sanction": ("제재", -1),
+            "oil": ("원자재", -1 if asset_type == "stock" else 0),
+            "fed": ("통화정책", -1),
+            "treasury": ("금리", -1),
+            "stimulus": ("정책완화", 1),
+            "ai": ("성장산업", 1),
+            "chip": ("성장산업", 1),
+            "soft landing": ("경기개선", 1),
+            "cut": ("정책완화", 1),
         }
 
         signals: List[Dict[str, int]] = []
@@ -1431,10 +1455,10 @@ class AnalysisService:
             macro_labels = ", ".join(signal["label"] for signal in macro_signals[:2] if signal.get("label"))
             if macro_labels:
                 if bias == "우호적":
-                    return f"{lead}은 대체로 우호적이며, {macro_labels} 요인이 심리를 지지하고 있습니다."
+                    return f"{lead}은 대체로 우호적이며, {macro_labels} 관련 흐름이 심리를 지지하고 있습니다."
                 if bias == "부담":
-                    return f"{lead}은 대체로 부담이며, {macro_labels} 요인이 단기 변동성을 키울 수 있습니다."
-                return f"{lead}은 뚜렷한 방향성은 없지만, {macro_labels} 이슈는 함께 확인할 필요가 있습니다."
+                    return f"{lead}은 대체로 부담이며, {macro_labels} 관련 흐름이 단기 변동성을 키울 수 있습니다."
+                return f"{lead}은 뚜렷한 방향성은 없지만, {macro_labels} 관련 흐름은 함께 확인할 필요가 있습니다."
 
         if bias == "우호적":
             return f"{lead}은 전반적으로 우호적입니다."

@@ -190,6 +190,7 @@ class TechnicalAnalysisResponse(BaseModel):
     momentum_score: int
     volume_score: int
     volatility_score: int
+    market_context_score: int
     risk_penalty: int
     summary_title: str
     summary_body: str
@@ -203,12 +204,15 @@ class TechnicalAnalysisResponse(BaseModel):
     timing_summary: str
     volume_summary: str
     volatility_summary: str
+    market_context_summary: str
     price_reference_summary: str
     decision_reasons: List[str] = Field(default_factory=list)
     trend_reasons: List[str] = Field(default_factory=list)
     momentum_reasons: List[str] = Field(default_factory=list)
     volume_reasons: List[str] = Field(default_factory=list)
     volatility_reasons: List[str] = Field(default_factory=list)
+    macro_reasons: List[str] = Field(default_factory=list)
+    news_reasons: List[str] = Field(default_factory=list)
     risk_reasons: List[str] = Field(default_factory=list)
     investor_summary: Optional[str] = None
     news_brief: Optional[str] = None

@@ -480,6 +480,18 @@ function renderAnalysis(data) {
       </ul>
     </section>
     <section class="analysis-section-card">
+      <h5>시장환경 해석</h5>
+      <p class="analysis-copy">${data.market_context_summary || "실시간 시장환경 근거가 충분하지 않아 보수적으로 해석했습니다."}</p>
+      <ul class="analysis-notes">
+        ${[
+          ...(data.macro_reasons || []),
+          ...(data.news_reasons || []),
+        ].length
+          ? [...(data.macro_reasons || []), ...(data.news_reasons || [])].map((reason) => `<li>${reason}</li>`).join("")
+          : "<li>실시간 뉴스·지수·거시 근거가 부족해 시장환경 점수는 중립으로 반영했습니다.</li>"}
+      </ul>
+    </section>
+    <section class="analysis-section-card">
       <h5>매수 · 매도 · 손절 구간</h5>
       <div class="analysis-grid analysis-plan-grid">
         ${buySellCards.join("")}
@@ -494,12 +506,6 @@ function renderAnalysis(data) {
       <section class="analysis-section-card">
         <h5>수급 해석</h5>
         <p class="analysis-copy">${data.investor_summary}</p>
-      </section>
-    ` : ""}
-    ${data.news_brief ? `
-      <section class="analysis-section-card">
-        <h5>뉴스·국제정세 영향</h5>
-        <p class="analysis-copy">${data.news_brief}</p>
       </section>
     ` : ""}
     <section class="analysis-section-card">
@@ -526,6 +532,10 @@ function renderAnalysis(data) {
         <div class="stat-card">
           <small>변동성 점수</small>
           <strong>${data.volatility_score}점</strong>
+        </div>
+        <div class="stat-card">
+          <small>시장환경 점수</small>
+          <strong>${data.market_context_score}점</strong>
         </div>
         <div class="stat-card">
           <small>위험 차감</small>
