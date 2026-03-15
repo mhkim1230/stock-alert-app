@@ -46,12 +46,11 @@
         </section>
 
         <section id="app-panel" class="hidden">
-          <div class="hero-card">
+          <div class="status-strip">
             <div>
               <p class="eyebrow">Cloud-only setup</p>
-              <h2>맥을 꺼도 그대로 유지됩니다</h2>
-              <p class="muted">
-                현재 사이트는 Render와 Supabase 위에서 동작합니다. 관심종목, 알림, 기록은 모두 클라우드에 저장됩니다.
+              <p class="muted compact">
+                Render와 Supabase에서 동작합니다. 맥을 꺼도 관심종목, 환율 알림, 뉴스 기록이 유지됩니다.
               </p>
             </div>
             <div class="hero-stats" id="hero-stats"></div>
@@ -61,13 +60,12 @@
             <button class="tab-button active" data-view="dashboard" type="button">대시보드</button>
             <button class="tab-button" data-view="watchlist" type="button">관심종목</button>
             <button class="tab-button" data-view="alerts" type="button">알림</button>
-            <button class="tab-button" data-view="explore" type="button">탐색</button>
             <button class="tab-button" data-view="settings" type="button">설정</button>
           </nav>
 
           <div class="content-grid">
             <section class="view active" data-view-panel="dashboard">
-              <div class="panel-grid">
+              <div class="panel-grid dashboard-grid">
                 <article class="panel-card">
                   <div class="panel-head">
                     <div>
@@ -77,6 +75,31 @@
                     <button id="refresh-dashboard" class="ghost-button small" type="button">새로고침</button>
                   </div>
                   <div id="summary-grid" class="summary-grid"></div>
+                  <div class="quick-actions">
+                    <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
+                    <button class="ghost-button" type="button" data-action="go-to-alerts">알림 관리로 이동</button>
+                  </div>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">FX</p>
+                      <h3>환율 조회</h3>
+                    </div>
+                  </div>
+                  <form id="fx-form" class="inline-form compact-form">
+                    <label class="field">
+                      <span>기준</span>
+                      <input name="base" value="USD" maxlength="3" required />
+                    </label>
+                    <label class="field">
+                      <span>대상</span>
+                      <input name="target" value="KRW" maxlength="3" required />
+                    </label>
+                    <button class="primary-button" type="submit">조회</button>
+                  </form>
+                  <div id="fx-result" class="empty-state">환율을 조회하면 여기에 표시됩니다.</div>
                 </article>
 
                 <article class="panel-card">
@@ -86,7 +109,24 @@
                       <h3>최근 알림</h3>
                     </div>
                   </div>
-                  <ul id="dashboard-notifications" class="timeline-list"></ul>
+                  <ul id="dashboard-notifications" class="timeline-list scroll-area"></ul>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">Latest News</p>
+                      <h3>뉴스 보기</h3>
+                    </div>
+                  </div>
+                  <form id="news-form" class="inline-form compact-form">
+                    <label class="field grow">
+                      <span>검색어</span>
+                      <input name="query" placeholder="AI, 금리, 삼성전자" />
+                    </label>
+                    <button class="primary-button" type="submit">불러오기</button>
+                  </form>
+                  <ul id="news-results" class="news-list scroll-area"></ul>
                 </article>
               </div>
             </section>
@@ -98,27 +138,30 @@
                     <p class="eyebrow">Watchlist</p>
                     <h3>관심종목 관리</h3>
                   </div>
+                  <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
                 </div>
-                <form id="watchlist-form" class="inline-form">
-                  <label class="field grow">
-                    <span>종목 코드</span>
-                    <input name="symbol" placeholder="AAPL 또는 005930" required />
-                  </label>
-                  <button class="primary-button" type="submit">추가</button>
-                </form>
-                <ul id="watchlist-list" class="resource-list"></ul>
+                <div class="callout">
+                  한글 종목명이나 코드로 검색한 뒤 결과에서 관심종목으로 추가하실 수 있습니다.
+                </div>
+                <ul id="watchlist-list" class="resource-list scroll-area tall"></ul>
               </div>
             </section>
 
             <section class="view" data-view-panel="alerts">
-              <div class="panel-grid">
-                <article class="panel-card">
-                  <div class="panel-head">
-                    <div>
-                      <p class="eyebrow">Stocks</p>
-                      <h3>주식 알림</h3>
-                    </div>
+              <div class="panel-card">
+                <div class="panel-head">
+                  <div>
+                    <p class="eyebrow">Alerts</p>
+                    <h3>알림 관리</h3>
                   </div>
+                </div>
+                <div class="sub-tabs" aria-label="알림 종류">
+                  <button class="sub-tab-button active" data-alert-view="stocks" type="button">주식</button>
+                  <button class="sub-tab-button" data-alert-view="currencies" type="button">환율</button>
+                  <button class="sub-tab-button" data-alert-view="news" type="button">뉴스</button>
+                </div>
+
+                <div class="alert-view active" data-alert-panel="stocks">
                   <form id="stock-alert-form" class="stack compact">
                     <div class="double-grid">
                       <label class="field">
@@ -140,16 +183,10 @@
                     </label>
                     <button class="primary-button" type="submit">주식 알림 추가</button>
                   </form>
-                  <ul id="stock-alert-list" class="resource-list"></ul>
-                </article>
+                  <ul id="stock-alert-list" class="resource-list scroll-area"></ul>
+                </div>
 
-                <article class="panel-card">
-                  <div class="panel-head">
-                    <div>
-                      <p class="eyebrow">Currencies</p>
-                      <h3>환율 알림</h3>
-                    </div>
-                  </div>
+                <div class="alert-view" data-alert-panel="currencies">
                   <form id="currency-alert-form" class="stack compact">
                     <div class="triple-grid">
                       <label class="field">
@@ -175,16 +212,10 @@
                     </label>
                     <button class="primary-button" type="submit">환율 알림 추가</button>
                   </form>
-                  <ul id="currency-alert-list" class="resource-list"></ul>
-                </article>
+                  <ul id="currency-alert-list" class="resource-list scroll-area"></ul>
+                </div>
 
-                <article class="panel-card">
-                  <div class="panel-head">
-                    <div>
-                      <p class="eyebrow">News</p>
-                      <h3>뉴스 키워드 알림</h3>
-                    </div>
-                  </div>
+                <div class="alert-view" data-alert-panel="news">
                   <form id="news-alert-form" class="stack compact">
                     <label class="field">
                       <span>키워드</span>
@@ -192,67 +223,8 @@
                     </label>
                     <button class="primary-button" type="submit">뉴스 알림 추가</button>
                   </form>
-                  <ul id="news-alert-list" class="resource-list"></ul>
-                </article>
-              </div>
-            </section>
-
-            <section class="view" data-view-panel="explore">
-              <div class="panel-grid">
-                <article class="panel-card">
-                  <div class="panel-head">
-                    <div>
-                      <p class="eyebrow">Market Search</p>
-                      <h3>종목 탐색</h3>
-                    </div>
-                  </div>
-                  <form id="stock-search-form" class="inline-form">
-                    <label class="field grow">
-                      <span>검색어</span>
-                      <input name="query" placeholder="Apple, Tesla, 삼성전자" required />
-                    </label>
-                    <button class="primary-button" type="submit">검색</button>
-                  </form>
-                  <ul id="stock-search-results" class="resource-list"></ul>
-                </article>
-
-                <article class="panel-card">
-                  <div class="panel-head">
-                    <div>
-                      <p class="eyebrow">FX</p>
-                      <h3>환율 조회</h3>
-                    </div>
-                  </div>
-                  <form id="fx-form" class="inline-form">
-                    <label class="field">
-                      <span>기준</span>
-                      <input name="base" value="USD" maxlength="3" required />
-                    </label>
-                    <label class="field">
-                      <span>대상</span>
-                      <input name="target" value="KRW" maxlength="3" required />
-                    </label>
-                    <button class="primary-button" type="submit">조회</button>
-                  </form>
-                  <div id="fx-result" class="empty-state">환율을 조회하면 여기에 표시됩니다.</div>
-                </article>
-
-                <article class="panel-card">
-                  <div class="panel-head">
-                    <div>
-                      <p class="eyebrow">Latest News</p>
-                      <h3>뉴스 보기</h3>
-                    </div>
-                  </div>
-                  <form id="news-form" class="inline-form">
-                    <label class="field grow">
-                      <span>검색어</span>
-                      <input name="query" placeholder="AI, 금리, 삼성전자" />
-                    </label>
-                    <button class="primary-button" type="submit">불러오기</button>
-                  </form>
-                  <ul id="news-results" class="news-list"></ul>
-                </article>
+                  <ul id="news-alert-list" class="resource-list scroll-area"></ul>
+                </div>
               </div>
             </section>
 
@@ -293,13 +265,95 @@
                       <h3>알림 기록</h3>
                     </div>
                   </div>
-                  <ul id="settings-notifications" class="timeline-list"></ul>
+                  <ul id="settings-notifications" class="timeline-list scroll-area tall"></ul>
                 </article>
               </div>
             </section>
           </div>
         </section>
       </main>
+    </div>
+
+    <div id="stock-search-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="stock-search-title">
+      <div class="modal-backdrop" data-action="close-stock-search"></div>
+      <div class="modal-card">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Stock Search</p>
+            <h3 id="stock-search-title">종목 검색</h3>
+          </div>
+          <button class="ghost-button small" type="button" data-action="close-stock-search">닫기</button>
+        </div>
+        <form id="stock-search-form" class="inline-form compact-form">
+          <label class="field grow">
+            <span>검색어</span>
+            <input id="stock-search-query" name="query" placeholder="삼성전자, Apple, TSLA, 005930" required />
+          </label>
+          <button class="primary-button" type="submit">검색</button>
+        </form>
+        <ul id="stock-search-results" class="resource-list scroll-area tall"></ul>
+      </div>
+    </div>
+
+    <div id="stock-alert-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="stock-alert-modal-title">
+      <div class="modal-backdrop" data-action="close-alert-modal"></div>
+      <div class="modal-card">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Watchlist Alert</p>
+            <h3 id="stock-alert-modal-title">관심종목 알림 추가</h3>
+          </div>
+          <button class="ghost-button small" type="button" data-action="close-alert-modal">닫기</button>
+        </div>
+        <div class="callout">
+          선택한 종목: <strong id="selected-alert-symbol">-</strong>
+        </div>
+
+        <div class="panel-grid compact-grid">
+          <article class="panel-card nested-card">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Price Alert</p>
+                <h3>주식 가격 알림</h3>
+              </div>
+            </div>
+            <form id="quick-stock-alert-form" class="stack compact">
+              <input id="quick-stock-symbol" name="stock_symbol" type="hidden" />
+              <div class="double-grid">
+                <label class="field">
+                  <span>목표 가격</span>
+                  <input name="target_price" type="number" min="0.01" step="0.01" required />
+                </label>
+                <label class="field">
+                  <span>조건</span>
+                  <select name="condition">
+                    <option value="above">이상</option>
+                    <option value="below">이하</option>
+                    <option value="equal">같음</option>
+                  </select>
+                </label>
+              </div>
+              <button class="primary-button" type="submit">주식 알림 추가</button>
+            </form>
+          </article>
+
+          <article class="panel-card nested-card">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">News Alert</p>
+                <h3>뉴스 키워드 알림</h3>
+              </div>
+            </div>
+            <form id="quick-news-alert-form" class="stack compact">
+              <label class="field">
+                <span>키워드</span>
+                <input id="quick-news-keywords" name="keywords" placeholder="예: AAPL, 애플, 삼성전자" required />
+              </label>
+              <button class="primary-button" type="submit">뉴스 알림 추가</button>
+            </form>
+          </article>
+        </div>
+      </div>
     </div>
 
     <div id="toast-root" class="toast-root" aria-live="polite"></div>

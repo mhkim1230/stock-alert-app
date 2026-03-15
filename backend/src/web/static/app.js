@@ -6,6 +6,7 @@ const state = {
   notifications: [],
   unreadCount: 0,
   installPrompt: null,
+  selectedAlertSymbol: "",
 };
 
 const elements = {
@@ -29,6 +30,12 @@ const elements = {
   newsResults: document.getElementById("news-results"),
   fxResult: document.getElementById("fx-result"),
   refreshDashboard: document.getElementById("refresh-dashboard"),
+  stockSearchModal: document.getElementById("stock-search-modal"),
+  stockSearchQuery: document.getElementById("stock-search-query"),
+  stockAlertModal: document.getElementById("stock-alert-modal"),
+  selectedAlertSymbol: document.getElementById("selected-alert-symbol"),
+  quickStockSymbol: document.getElementById("quick-stock-symbol"),
+  quickNewsKeywords: document.getElementById("quick-news-keywords"),
 };
 
 async function request(path, options = {}) {
@@ -68,13 +75,14 @@ function showToast(message, kind = "info") {
 }
 
 function setView(name) {
+  const nextView = document.querySelector(`.tab-button[data-view="${name}"]`) ? name : "dashboard";
   document.querySelectorAll(".tab-button").forEach((button) => {
-    button.classList.toggle("active", button.dataset.view === name);
+    button.classList.toggle("active", button.dataset.view === nextView);
   });
   document.querySelectorAll(".view").forEach((panel) => {
-    panel.classList.toggle("active", panel.dataset.viewPanel === name);
+    panel.classList.toggle("active", panel.dataset.viewPanel === nextView);
   });
-  window.location.hash = name;
+  window.location.hash = nextView;
 }
 
 function toLocalDate(value) {
@@ -109,7 +117,7 @@ function renderStats() {
 
 function renderWatchlist() {
   if (!state.watchlist.length) {
-    elements.watchlistList.innerHTML = `<li class="empty-state">아직 관심종목이 없습니다. 위에서 종목 코드를 추가해 주세요.</li>`;
+    elements.watchlistList.innerHTML = `<li class="empty-state">아직 관심종목이 없습니다. 종목 검색 팝업에서 바로 추가해 주세요.</li>`;
     return;
   }
 
@@ -121,7 +129,10 @@ function renderWatchlist() {
             <strong>${item.symbol}</strong>
             <small>등록 ${toLocalDate(item.created_at)}</small>
           </div>
-          <button class="danger-button" type="button" data-action="delete-watchlist" data-symbol="${item.symbol}">삭제</button>
+          <div class="resource-actions">
+            <button class="ghost-button small" type="button" data-action="open-alert-modal" data-symbol="${item.symbol}">알림</button>
+            <button class="danger-button" type="button" data-action="delete-watchlist" data-symbol="${item.symbol}">삭제</button>
+          </div>
         </li>
       `
     )
@@ -150,13 +161,13 @@ function renderAlertList(target, items, formatter, deleteAction) {
     .join("");
 }
 
-function renderNotifications(listTarget) {
-  if (!state.notifications.length) {
+function renderNotifications(listTarget, items = state.notifications) {
+  if (!items.length) {
     listTarget.innerHTML = `<li class="empty-state">알림 기록이 아직 없습니다.</li>`;
     return;
   }
 
-  listTarget.innerHTML = state.notifications
+  listTarget.innerHTML = items
     .map(
       (item) => `
         <li class="timeline-item">
@@ -191,7 +202,7 @@ function renderAll() {
     (item) => item.keywords,
     "delete-news-alert"
   );
-  renderNotifications(elements.dashboardNotifications);
+  renderNotifications(elements.dashboardNotifications, state.notifications.slice(0, 5));
   renderNotifications(elements.settingsNotifications);
 }
 
@@ -224,6 +235,8 @@ function showLoggedOut() {
   elements.loginPanel.classList.remove("hidden");
   elements.appPanel.classList.add("hidden");
   elements.logoutButton.classList.add("hidden");
+  closeStockSearchModal();
+  closeAlertModal();
 }
 
 async function bootstrap() {
@@ -274,6 +287,56 @@ async function handleWatchlistSubmit(event) {
   form.reset();
   await refreshData();
   showToast("관심종목을 추가했습니다.", "success");
+}
+
+function openStockSearchModal(query = "") {
+  elements.stockSearchModal.classList.remove("hidden");
+  if (typeof query === "string" && query) {
+    elements.stockSearchQuery.value = query;
+  }
+  elements.stockSearchQuery.focus();
+}
+
+function closeStockSearchModal() {
+  elements.stockSearchModal.classList.add("hidden");
+}
+
+function openAlertModal(symbol) {
+  state.selectedAlertSymbol = symbol;
+  elements.selectedAlertSymbol.textContent = symbol;
+  elements.quickStockSymbol.value = symbol;
+  elements.quickNewsKeywords.value = symbol;
+  elements.stockAlertModal.classList.remove("hidden");
+}
+
+function closeAlertModal() {
+  state.selectedAlertSymbol = "";
+  elements.stockAlertModal.classList.add("hidden");
+}
+
+function renderStockSearchResults(results) {
+  if (!results.length) {
+    elements.stockSearchResults.innerHTML = `<li class="empty-state">검색 결과가 없습니다.</li>`;
+    return;
+  }
+
+  elements.stockSearchResults.innerHTML = results
+    .map(
+      (item) => `
+        <li class="resource-item">
+          <div class="resource-meta">
+            <strong>${item.symbol} · ${item.name}</strong>
+            <small>${item.price} ${item.currency || ""}</small>
+            <small>${item.source}</small>
+          </div>
+          <div class="resource-actions">
+            <button class="primary-button small-button" type="button" data-action="add-watchlist-symbol" data-symbol="${item.symbol}">관심종목 추가</button>
+            <button class="ghost-button small" type="button" data-action="open-alert-modal" data-symbol="${item.symbol}">알림</button>
+          </div>
+        </li>
+      `
+    )
+    .join("");
 }
 
 async function handleStockAlertSubmit(event) {
@@ -330,25 +393,7 @@ async function handleStockSearch(event) {
   const formData = new FormData(form);
   const query = formData.get("query");
   const payload = await request(`/stocks/search?query=${encodeURIComponent(query)}`);
-  const results = payload.results || [];
-  if (!results.length) {
-    elements.stockSearchResults.innerHTML = `<li class="empty-state">검색 결과가 없습니다.</li>`;
-    return;
-  }
-  elements.stockSearchResults.innerHTML = results
-    .map(
-      (item) => `
-        <li class="resource-item">
-          <div class="resource-meta">
-            <strong>${item.symbol} · ${item.name}</strong>
-            <small>${item.price} ${item.currency || ""}</small>
-            <small>${item.source}</small>
-          </div>
-          <button class="ghost-button small" type="button" data-action="fill-stock-symbol" data-symbol="${item.symbol}">알림에 사용</button>
-        </li>
-      `
-    )
-    .join("");
+  renderStockSearchResults(payload.results || []);
 }
 
 async function handleFxLookup(event) {
@@ -391,6 +436,51 @@ async function handleNewsSearch(event) {
     .join("");
 }
 
+async function handleQuickStockAlertSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  await request("/alerts/stocks", {
+    method: "POST",
+    body: JSON.stringify({
+      stock_symbol: formData.get("stock_symbol"),
+      target_price: Number(formData.get("target_price")),
+      condition: formData.get("condition"),
+    }),
+  });
+  form.reset();
+  closeAlertModal();
+  await refreshData();
+  setView("alerts");
+  setAlertView("stocks");
+  showToast("주식 알림을 추가했습니다.", "success");
+}
+
+async function handleQuickNewsAlertSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  await request("/alerts/news", {
+    method: "POST",
+    body: JSON.stringify({ keywords: formData.get("keywords") }),
+  });
+  form.reset();
+  closeAlertModal();
+  await refreshData();
+  setView("alerts");
+  setAlertView("news");
+  showToast("뉴스 알림을 추가했습니다.", "success");
+}
+
+function setAlertView(name) {
+  document.querySelectorAll(".sub-tab-button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.alertView === name);
+  });
+  document.querySelectorAll(".alert-view").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.alertPanel === name);
+  });
+}
+
 async function handleListActions(event) {
   const action = event.target.dataset.action;
   if (!action) {
@@ -398,7 +488,30 @@ async function handleListActions(event) {
   }
 
   try {
-    if (action === "delete-watchlist") {
+    if (action === "open-stock-search") {
+      openStockSearchModal();
+      return;
+    } else if (action === "close-stock-search") {
+      closeStockSearchModal();
+      return;
+    } else if (action === "go-to-alerts") {
+      setView("alerts");
+      return;
+    } else if (action === "open-alert-modal") {
+      openAlertModal(event.target.dataset.symbol);
+      return;
+    } else if (action === "close-alert-modal") {
+      closeAlertModal();
+      return;
+    } else if (action === "add-watchlist-symbol") {
+      await request("/watchlist", {
+        method: "POST",
+        body: JSON.stringify({ symbol: event.target.dataset.symbol }),
+      });
+      closeStockSearchModal();
+      setView("watchlist");
+      showToast("관심종목을 추가했습니다.", "success");
+    } else if (action === "delete-watchlist") {
       await request(`/watchlist/${event.target.dataset.symbol}`, { method: "DELETE" });
       showToast("관심종목을 삭제했습니다.", "info");
     } else if (action === "delete-stock-alert") {
@@ -413,11 +526,6 @@ async function handleListActions(event) {
     } else if (action === "read-notification") {
       await request(`/notifications/${event.target.dataset.id}/read`, { method: "PATCH" });
       showToast("알림을 읽음 처리했습니다.", "success");
-    } else if (action === "fill-stock-symbol") {
-      document.querySelector('#stock-alert-form input[name="stock_symbol"]').value = event.target.dataset.symbol;
-      setView("alerts");
-      showToast("주식 알림 폼에 종목 코드를 넣었습니다.", "info");
-      return;
     }
     await refreshData();
   } catch (error) {
@@ -453,8 +561,13 @@ function setupRouting() {
     button.addEventListener("click", () => setView(button.dataset.view));
   });
 
+  document.querySelectorAll(".sub-tab-button").forEach((button) => {
+    button.addEventListener("click", () => setAlertView(button.dataset.alertView));
+  });
+
   const initialView = window.location.hash.replace("#", "") || "dashboard";
   setView(initialView);
+  setAlertView("stocks");
 }
 
 function setupServiceWorker() {
@@ -463,14 +576,17 @@ function setupServiceWorker() {
   }
 }
 
-document.getElementById("watchlist-form").addEventListener("submit", handleWatchlistSubmit);
 document.getElementById("stock-alert-form").addEventListener("submit", handleStockAlertSubmit);
 document.getElementById("currency-alert-form").addEventListener("submit", handleCurrencyAlertSubmit);
 document.getElementById("news-alert-form").addEventListener("submit", handleNewsAlertSubmit);
 document.getElementById("stock-search-form").addEventListener("submit", handleStockSearch);
 document.getElementById("fx-form").addEventListener("submit", handleFxLookup);
 document.getElementById("news-form").addEventListener("submit", handleNewsSearch);
+document.getElementById("quick-stock-alert-form").addEventListener("submit", handleQuickStockAlertSubmit);
+document.getElementById("quick-news-alert-form").addEventListener("submit", handleQuickNewsAlertSubmit);
 document.getElementById("app").addEventListener("click", handleListActions);
+document.getElementById("stock-search-modal").addEventListener("click", handleListActions);
+document.getElementById("stock-alert-modal").addEventListener("click", handleListActions);
 elements.loginForm.addEventListener("submit", handleLogin);
 elements.logoutButton.addEventListener("click", handleLogout);
 elements.settingsLogoutButton.addEventListener("click", handleLogout);
