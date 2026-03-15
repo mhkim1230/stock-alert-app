@@ -1,5 +1,5 @@
-import asyncio
 import logging
+from datetime import datetime
 from statistics import mean, pstdev
 from typing import Dict, List, Optional, Tuple
 
@@ -27,17 +27,18 @@ class AnalysisService:
         analysis_window = self._get_analysis_window(period)
 
         yahoo_symbol = await self._resolve_stock_symbol(symbol, stock_market)
-        history = await self._fetch_history(
+        raw_history = await self._fetch_history(
             yahoo_symbol,
             range_value=analysis_window["range"],
             interval_value=analysis_window["interval"],
         )
+        history = self._normalize_history_for_period(raw_history, period)
         if not history:
             return None
         if symbol.isdigit():
             investor_flow = await self._fetch_investor_flow(symbol)
         else:
-            investor_flow = self._build_global_flow(history)
+            investor_flow = self._build_global_flow(raw_history if raw_history else history)
         news_context = await self.market_context_service.build_context(
             asset_type="stock",
             symbol=symbol.upper(),
@@ -59,11 +60,12 @@ class AnalysisService:
     async def get_currency_analysis(self, base: str, target: str, period: str = "short") -> Optional[Dict]:
         pair = f"{base.upper()}{target.upper()}=X"
         analysis_window = self._get_analysis_window(period)
-        history = await self._fetch_history(
+        raw_history = await self._fetch_history(
             pair,
             range_value=analysis_window["range"],
             interval_value=analysis_window["interval"],
         )
+        history = self._normalize_history_for_period(raw_history, period)
         if not history:
             return None
         news_context = await self.market_context_service.build_context(
@@ -133,11 +135,14 @@ class AnalysisService:
         volumes = quote.get("volume") or []
 
         candles: List[Dict[str, float]] = []
-        for open_, high, low, close, volume in zip(opens, highs, lows, closes, volumes):
+        timestamps = result.get("timestamp") or []
+
+        for timestamp, open_, high, low, close, volume in zip(timestamps, opens, highs, lows, closes, volumes):
             if None in (open_, high, low, close):
                 continue
             candles.append(
                 {
+                    "timestamp": int(timestamp),
                     "open": float(open_),
                     "high": float(high),
                     "low": float(low),
@@ -154,7 +159,7 @@ class AnalysisService:
             "intraday": {"range": "10d", "interval": "30m", "label": "30분 · 30분봉 기준 최근 10일"},
             "short": {"range": "6mo", "interval": "1d", "label": "단기 · 일봉 기준 최근 6개월"},
             "medium": {"range": "2y", "interval": "1wk", "label": "중기 · 주봉 기준 최근 2년"},
-            "long": {"range": "5y", "interval": "1mo", "label": "장기 · 월봉 기준 최근 5년"},
+            "long": {"range": "20y", "interval": "1mo", "label": "장기 · 년봉 기준 최근 20년"},
         }
         return mapping.get(normalized, mapping["short"])
 
@@ -199,19 +204,54 @@ class AnalysisService:
                 "secondary_label": "26주",
             },
             "long": {
-                "primary_span": 12,
-                "secondary_span": 36,
-                "buy_gap_1": 0.1,
-                "buy_gap_2": 0.22,
-                "sell_gap_1": 0.1,
-                "sell_gap_2": 0.22,
-                "stop_factor": 0.94,
-                "low_factor": 0.975,
-                "primary_label": "12개월",
-                "secondary_label": "36개월",
+                "primary_span": 3,
+                "secondary_span": 5,
+                "buy_gap_1": 0.12,
+                "buy_gap_2": 0.24,
+                "sell_gap_1": 0.12,
+                "sell_gap_2": 0.24,
+                "stop_factor": 0.93,
+                "low_factor": 0.97,
+                "primary_label": "3년",
+                "secondary_label": "5년",
             },
         }
         return profiles.get(normalized, profiles["short"])
+
+    def _normalize_history_for_period(self, history: List[Dict[str, float]], period: str) -> List[Dict[str, float]]:
+        if (period or "").lower() != "long":
+            return history
+        return self._aggregate_to_yearly_candles(history)
+
+    @staticmethod
+    def _aggregate_to_yearly_candles(history: List[Dict[str, float]]) -> List[Dict[str, float]]:
+        buckets: Dict[int, Dict[str, float]] = {}
+        order: List[int] = []
+        for candle in history:
+            timestamp = candle.get("timestamp")
+            if not timestamp:
+                continue
+            year = datetime.utcfromtimestamp(int(timestamp)).year
+            if year not in buckets:
+                order.append(year)
+                buckets[year] = {
+                    "timestamp": int(timestamp),
+                    "open": candle["open"],
+                    "high": candle["high"],
+                    "low": candle["low"],
+                    "close": candle["close"],
+                    "volume": float(candle.get("volume", 0.0) or 0.0),
+                }
+                continue
+
+            current = buckets[year]
+            current["high"] = max(current["high"], candle["high"])
+            current["low"] = min(current["low"], candle["low"])
+            current["close"] = candle["close"]
+            current["timestamp"] = int(timestamp)
+            current["volume"] += float(candle.get("volume", 0.0) or 0.0)
+
+        return [buckets[year] for year in order]
 
     async def _fetch_investor_flow(self, symbol: str) -> Optional[Dict]:
         url = f"https://finance.naver.com/item/main.naver?code={symbol}"
