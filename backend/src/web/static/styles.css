@@ -505,18 +505,23 @@ button:disabled {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
+  line-height: 1.2;
 }
 
 .quote-price {
+  display: inline-block;
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .quote-change {
+  display: inline-block;
   font-size: 0.73rem;
   font-weight: 700;
   color: var(--muted);
+  line-height: 1.2;
 }
 
 .quote-change.up {
@@ -1035,7 +1040,14 @@ button:disabled {
   .quote-line {
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
+    gap: 3px;
+    line-height: 1.2;
+  }
+
+  .quote-price,
+  .quote-change {
+    display: block;
+    line-height: 1.2;
   }
 
   .modal {
