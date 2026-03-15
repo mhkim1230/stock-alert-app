@@ -184,18 +184,16 @@ class TechnicalAnalysisResponse(BaseModel):
     stop_loss: float
     confidence_score: int
     confidence_label: str
-    volume_ratio: Optional[float] = None
-    volume_signal: Optional[str] = None
-    rsi14: Optional[float] = None
-    macd: Optional[float] = None
-    macd_signal: Optional[float] = None
-    macd_histogram: Optional[float] = None
-    atr14: Optional[float] = None
-    investor_flow: Optional[Dict[str, Any]] = None
-    news_bias: Optional[str] = None
-    market_context: Optional[str] = None
-    related_headlines: List[str] = Field(default_factory=list)
-    macro_headlines: List[str] = Field(default_factory=list)
+    summary_title: str
+    summary_body: str
+    trend_outlook: str
+    action_plan: str
+    buy_plan: str
+    sell_plan: str
+    loss_cut_plan: str
+    investor_summary: Optional[str] = None
+    news_brief: Optional[str] = None
+    risk_notes: List[str] = Field(default_factory=list)
     timeframe: str
     source: str
     notes: List[str]

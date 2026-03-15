@@ -35,10 +35,8 @@ const elements = {
   settingsInstallButton: document.getElementById("settings-install-button"),
   watchlistList: document.getElementById("watchlist-list"),
   fxWatchlistList: document.getElementById("fx-watchlist-list"),
-  dashboardNotifications: document.getElementById("dashboard-notifications"),
   settingsNotifications: document.getElementById("settings-notifications"),
   stockSearchResults: document.getElementById("stock-search-results"),
-  newsResults: document.getElementById("news-results"),
   fxResult: document.getElementById("fx-result"),
   refreshDashboard: document.getElementById("refresh-dashboard"),
   stockSearchModal: document.getElementById("stock-search-modal"),
@@ -57,6 +55,9 @@ const elements = {
   quickFxTarget: document.getElementById("quick-fx-target"),
   quickFxAlertForm: document.getElementById("quick-fx-alert-form"),
   analysisModal: document.getElementById("analysis-modal"),
+  analysisTitle: document.getElementById("analysis-title"),
+  analysisSubtitle: document.getElementById("analysis-subtitle"),
+  analysisPrice: document.getElementById("analysis-price"),
   analysisRangeSwitch: document.getElementById("analysis-range-switch"),
   analysisBody: document.getElementById("analysis-body"),
 };
@@ -443,51 +444,17 @@ function renderAnalysisAlertCard({ label, value, priceUnit, assetType, symbol, b
   `;
 }
 
+function setAnalysisHeader({ title = "상세분석", subtitle = "종목을 선택하면 종합 보고서를 보여드립니다.", price = "-" } = {}) {
+  elements.analysisTitle.textContent = title;
+  elements.analysisSubtitle.textContent = subtitle;
+  elements.analysisPrice.textContent = price;
+}
+
 function renderAnalysis(data) {
   const formatter = data.asset_type === "currency" ? formatRate : formatPrice;
   const analysisContext = state.analysisContext || {};
   const analysisBase = analysisContext.base || data.symbol.split("/")[0];
   const analysisTarget = analysisContext.target || data.symbol.split("/")[1];
-  const indicatorRows = [
-    { label: "거래량 신호", value: data.volume_signal || "데이터 없음" },
-    { label: "거래량 비율", value: data.volume_ratio ? `${data.volume_ratio.toFixed(2)}배` : "-" },
-    { label: "RSI(14)", value: data.rsi14 ?? "-" },
-    { label: "MACD", value: data.macd ?? "-" },
-    { label: "MACD 신호선", value: data.macd_signal ?? "-" },
-    { label: "ATR(14)", value: data.atr14 ?? "-" },
-  ];
-
-  let investorMarkup = `
-    <div class="analysis-section">
-      <h5>수급 흐름</h5>
-      <div class="callout">수급 데이터를 계산하지 못했습니다.</div>
-    </div>
-  `;
-  if (data.investor_flow?.market_scope === "domestic") {
-    investorMarkup = `
-      <div class="analysis-section">
-        <h5>수급 흐름</h5>
-        <div class="analysis-grid compact-analysis-grid">
-          <div class="stat-card"><small>외국인 5일</small><strong>${data.investor_flow.foreign_direction} ${Number(data.investor_flow.foreign_5d).toLocaleString("ko-KR")}</strong></div>
-          <div class="stat-card"><small>기관 5일</small><strong>${data.investor_flow.institution_direction} ${Number(data.investor_flow.institution_5d).toLocaleString("ko-KR")}</strong></div>
-        </div>
-        <div class="callout compact-callout">${data.investor_flow.summary}</div>
-      </div>
-    `;
-  } else if (data.investor_flow?.market_scope === "global") {
-    investorMarkup = `
-      <div class="analysis-section">
-        <h5>수급 흐름</h5>
-        <div class="analysis-grid compact-analysis-grid">
-          <div class="stat-card"><small>20일 수급 추정</small><strong>${data.investor_flow.flow_label || "-"}</strong></div>
-          <div class="stat-card"><small>상승/하락 거래량 비율</small><strong>${data.investor_flow.up_down_volume_ratio ? `${data.investor_flow.up_down_volume_ratio.toFixed(2)}배` : "-"}</strong></div>
-          <div class="stat-card"><small>OBV 방향</small><strong>${data.investor_flow.obv_direction || "-"}</strong></div>
-          <div class="stat-card"><small>자금누적 방향</small><strong>${data.investor_flow.adl_direction || "-"}</strong></div>
-        </div>
-        <div class="callout compact-callout">${data.investor_flow.summary}</div>
-      </div>
-    `;
-  }
 
   const buySellCards = [
     renderAnalysisAlertCard({
@@ -536,44 +503,75 @@ function renderAnalysis(data) {
     }),
   ];
 
-  const newsMarkup = `
-    <div class="analysis-section">
-      <h5>뉴스/국제정세 영향</h5>
-      <div class="callout">${data.market_context || "현재 반영할 뉴스 요약이 없습니다."}</div>
-      <div class="pill-row">
-        <span class="result-pill">뉴스 영향 ${data.news_bias || "중립"}</span>
-      </div>
-      ${(data.related_headlines || []).length ? `<ul class="analysis-headlines">${data.related_headlines.map((headline) => `<li>${headline}</li>`).join("")}</ul>` : ""}
-      ${(data.macro_headlines || []).length ? `<ul class="analysis-headlines muted-list">${data.macro_headlines.map((headline) => `<li>${headline}</li>`).join("")}</ul>` : ""}
-    </div>
-  `;
+  setAnalysisHeader({
+    title: `${data.name}`,
+    subtitle: `${data.symbol} · ${data.timeframe}`,
+    price: formatter(data.current_price, data.price_unit),
+  });
 
   elements.analysisBody.innerHTML = `
-    <div class="analysis-hero">
-      <div>
-        <p class="eyebrow">${data.timeframe}</p>
-        <h4>${data.name}</h4>
-        <p class="muted">${data.symbol} · ${data.trend} · ${data.bias}</p>
+    <section class="analysis-hero-card">
+      <p class="analysis-chip">${data.trend}</p>
+      <h4>${data.summary_title}</h4>
+      <p class="analysis-copy">${data.summary_body}</p>
+      <div class="analysis-meta-grid">
+        <div class="stat-card">
+          <small>분석 신뢰도</small>
+          <strong>${data.confidence_score}점 · ${data.confidence_label}</strong>
+        </div>
+        <div class="stat-card">
+          <small>기본 대응</small>
+          <strong>${data.bias}</strong>
+        </div>
       </div>
-      <div class="analysis-price">${formatter(data.current_price, data.price_unit)}</div>
-    </div>
-    <div class="analysis-grid">
-      <div class="stat-card"><small>분석 신뢰도</small><strong>${data.confidence_score}점 · ${data.confidence_label}</strong></div>
-      ${buySellCards.join("")}
-      <div class="stat-card"><small>손절 기준</small><strong>${formatter(data.stop_loss, data.price_unit)}</strong></div>
-      <div class="stat-card"><small>데이터 소스</small><strong>${data.source}</strong></div>
-    </div>
-    <div class="analysis-section">
-      <h5>기술 지표</h5>
-      <div class="analysis-grid compact-analysis-grid">
-        ${indicatorRows.map((item) => `<div class="stat-card"><small>${item.label}</small><strong>${item.value}</strong></div>`).join("")}
+    </section>
+    <section class="analysis-section-card">
+      <h5>추세 예측</h5>
+      <p class="analysis-copy">${data.trend_outlook}</p>
+    </section>
+    <section class="analysis-section-card">
+      <h5>대응 전략</h5>
+      <p class="analysis-copy">${data.action_plan}</p>
+    </section>
+    <section class="analysis-section-card">
+      <h5>매수 · 매도 · 손절 구간</h5>
+      <div class="analysis-grid analysis-plan-grid">
+        ${buySellCards.join("")}
+        <div class="stat-card">
+          <small>손절 기준</small>
+          <strong>${formatter(data.stop_loss, data.price_unit)}</strong>
+        </div>
       </div>
-    </div>
-    ${investorMarkup}
-    ${newsMarkup}
-    <ul class="analysis-notes">
+      <div class="analysis-copy-group">
+        <p class="analysis-copy"><strong>매수 전략</strong> ${data.buy_plan}</p>
+        <p class="analysis-copy"><strong>매도 전략</strong> ${data.sell_plan}</p>
+        <p class="analysis-copy"><strong>손절 전략</strong> ${data.loss_cut_plan}</p>
+      </div>
+    </section>
+    ${data.investor_summary ? `
+      <section class="analysis-section-card">
+        <h5>수급 해석</h5>
+        <p class="analysis-copy">${data.investor_summary}</p>
+      </section>
+    ` : ""}
+    ${data.news_brief ? `
+      <section class="analysis-section-card">
+        <h5>뉴스·국제정세 영향</h5>
+        <p class="analysis-copy">${data.news_brief}</p>
+      </section>
+    ` : ""}
+    <section class="analysis-section-card">
+      <h5>위험 요인</h5>
+      <ul class="analysis-notes">
+        ${(data.risk_notes || []).length ? data.risk_notes.map((note) => `<li>${note}</li>`).join("") : "<li>현재 확인된 특이 위험 요인은 제한적입니다.</li>"}
+      </ul>
+    </section>
+    <section class="analysis-section-card">
+      <h5>판단 근거</h5>
+      <ul class="analysis-notes">
       ${data.notes.map((note) => `<li>${note}</li>`).join("")}
-    </ul>
+      </ul>
+    </section>
   `;
 }
 
@@ -617,7 +615,6 @@ function renderAll() {
   renderStats();
   renderStockWatchlist();
   renderFxWatchlist();
-  renderNotifications(elements.dashboardNotifications, state.notifications.slice(0, 5));
   renderNotifications(elements.settingsNotifications);
   if (state.selectedAlertSymbol) {
     renderSelectedStockAlerts();
@@ -795,6 +792,7 @@ function openAnalysisModal() {
 function closeAnalysisModal() {
   elements.analysisModal.classList.add("hidden");
   elements.analysisBody.innerHTML = "";
+  setAnalysisHeader();
   state.analysisContext = null;
 }
 
@@ -874,42 +872,6 @@ async function handleFxLookup(event) {
     });
   } catch (error) {
     showLoadingCard(elements.fxResult, error.message);
-    showToast(error.message, "error");
-  }
-}
-
-async function handleNewsSearch(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const formData = new FormData(form);
-  const query = formData.get("query");
-  const qs = query ? `?query=${encodeURIComponent(query)}` : "";
-
-  showLoadingList(elements.newsResults, "뉴스를 불러오는 중입니다...");
-  try {
-    await withFormBusy(form, "조회 중...", async () => {
-      const payload = await request(`/news${qs}`, {
-        loadingMessage: "뉴스를 불러오는 중입니다...",
-      });
-      if (!payload.length) {
-        elements.newsResults.innerHTML = `<li class="empty-state">뉴스가 없습니다.</li>`;
-        return;
-      }
-      elements.newsResults.innerHTML = payload
-        .map(
-          (item) => `
-            <li class="news-item">
-              <strong>${item.title}</strong>
-              <small>${item.source} · ${item.published}</small>
-              <p class="muted">${item.summary}</p>
-              <a class="result-pill" href="${item.url}" target="_blank" rel="noreferrer">원문 보기</a>
-            </li>
-          `
-        )
-        .join("");
-    });
-  } catch (error) {
-    elements.newsResults.innerHTML = `<li class="empty-state">${error.message}</li>`;
     showToast(error.message, "error");
   }
 }
@@ -1057,6 +1019,11 @@ async function loadCurrentAnalysis() {
 
   const { assetType, symbol, market, base, target, period } = state.analysisContext;
   const basisLabel = period === "medium" ? "주봉" : period === "long" ? "월봉" : "일봉";
+  setAnalysisHeader({
+    title: "상세분석 준비 중",
+    subtitle: `${basisLabel} 기준 종합 보고서를 만드는 중입니다.`,
+    price: "-",
+  });
   showLoadingCard(elements.analysisBody, `${basisLabel} 기준으로 상세분석을 준비하는 중입니다...`);
 
   try {
@@ -1316,7 +1283,6 @@ function setupServiceWorker() {
 
 document.getElementById("stock-search-form").addEventListener("submit", handleStockSearch);
 document.getElementById("fx-form").addEventListener("submit", handleFxLookup);
-document.getElementById("news-form").addEventListener("submit", handleNewsSearch);
 document.getElementById("quick-stock-alert-form").addEventListener("submit", handleQuickStockAlertSubmit);
 document.getElementById("quick-news-alert-form").addEventListener("submit", handleQuickNewsAlertSubmit);
 document.getElementById("quick-fx-alert-form").addEventListener("submit", handleQuickFxAlertSubmit);

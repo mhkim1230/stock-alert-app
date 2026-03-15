@@ -105,32 +105,6 @@
                   </div>
                 </article>
 
-                <article class="panel-card compact-panel">
-                  <div class="panel-head">
-                    <div>
-                      <p class="eyebrow">최근 활동</p>
-                      <h3>최근 알림</h3>
-                    </div>
-                  </div>
-                  <ul id="dashboard-notifications" class="timeline-list scroll-area"></ul>
-                </article>
-
-                <article class="panel-card compact-panel">
-                  <div class="panel-head">
-                    <div>
-                      <p class="eyebrow">뉴스</p>
-                      <h3>뉴스 보기</h3>
-                    </div>
-                  </div>
-                  <form id="news-form" class="inline-form compact-form">
-                    <label class="field grow">
-                      <span>검색어</span>
-                      <input name="query" placeholder="AI, 금리, 삼성전자" />
-                    </label>
-                    <button class="primary-button" type="submit">불러오기</button>
-                  </form>
-                  <ul id="news-results" class="news-list scroll-area"></ul>
-                </article>
               </div>
             </section>
 
@@ -317,15 +291,19 @@
       </div>
     </div>
 
-    <div id="analysis-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="analysis-title">
+    <div id="analysis-modal" class="modal hidden analysis-modal" role="dialog" aria-modal="true" aria-labelledby="analysis-title">
       <div class="modal-backdrop" data-action="close-analysis-modal"></div>
       <div class="modal-card analysis-modal-card">
         <div class="panel-head modal-sticky-head">
-          <div>
-            <p class="eyebrow">상세분석</p>
+          <div class="analysis-header-copy">
+            <p class="eyebrow">상세분석 보고서</p>
             <h3 id="analysis-title">상세분석</h3>
+            <p id="analysis-subtitle" class="analysis-subtitle">종목을 선택하면 종합 보고서를 보여드립니다.</p>
           </div>
-          <button class="ghost-button small" type="button" data-action="close-analysis-modal">닫기</button>
+          <div class="analysis-header-side">
+            <strong id="analysis-price" class="analysis-header-price">-</strong>
+            <button class="ghost-button small" type="button" data-action="close-analysis-modal">닫기</button>
+          </div>
         </div>
         <div id="analysis-range-switch" class="analysis-range-switch" role="radiogroup" aria-label="분석 기간">
           <label class="analysis-range-option">

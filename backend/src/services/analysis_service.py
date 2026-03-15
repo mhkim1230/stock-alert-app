@@ -355,9 +355,8 @@ class AnalysisService:
 
         return {
             "news_bias": bias,
-            "related_headlines": [item["title"] for item in related_articles[:3]],
-            "macro_headlines": [item["headline"] for item in macro_signals[:3]],
             "summary": self._compose_news_summary(bias, related_articles, macro_signals, asset_type),
+            "themes": [item["label"] for item in macro_signals[:3]],
         }
 
     def _build_analysis(
@@ -453,26 +452,64 @@ class AnalysisService:
             news_context=news_context,
         )
         confidence_label = self._label_confidence(confidence_score)
-
-        notes = [
-            f"{profile['primary_label']} 평균 {self._fmt(sma20, price_unit, asset_type)}, {profile['secondary_label']} 평균 {self._fmt(sma60, price_unit, asset_type)} 기준입니다.",
-            f"최근 {profile['primary_label']} 고점/저점은 {self._fmt(high20, price_unit, asset_type)} / {self._fmt(low20, price_unit, asset_type)} 입니다.",
-            f"1차 매수는 현재가 아래의 가까운 지지선, 2차 매수는 중기 지지선 기준입니다.",
-            f"1차 매도는 단기 저항, 2차 매도는 최근 중기 고점 기준입니다.",
-            f"거래량 신호는 최근 20일 평균 대비 비율({volume_ratio:.2f}배)로 계산합니다." if volume_ratio is not None else "거래량 데이터는 현재 분석에 반영되지 않았습니다.",
-            (
-                f"RSI(14)는 {rsi14:.2f}, MACD 히스토그램은 {macd_hist:.4f}, ATR(14)는 {atr14:.4f} 입니다."
-                if None not in (rsi14, macd_hist, atr14)
-                else "보조지표는 사용 가능한 최근 데이터 범위에서 계산했습니다."
-            ),
-            "이 신뢰도는 가격 구조 일치도를 수치화한 값이며, 실제 수익률 정확도를 보장하지는 않습니다.",
-        ]
-        if investor_flow:
-            notes.append(investor_flow["summary"])
-            if investor_flow.get("market_scope") == "global":
-                notes.append("해외주식 수급은 무료 가격·거래량 데이터 기반 추정치이며, 기관/외국인 실거래 집계는 아닙니다.")
-        if news_context.get("summary"):
-            notes.append(news_context["summary"])
+        investor_summary = self._summarize_investor_flow(investor_flow)
+        news_brief = news_context.get("summary")
+        summary_title = self._build_summary_title(trend, bias, confidence_label)
+        summary_body = self._build_summary_body(
+            trend=trend,
+            bias=bias,
+            timeframe=timeframe,
+            volume_signal=volume_signal,
+            investor_summary=investor_summary,
+            news_brief=news_brief,
+        )
+        trend_outlook = self._build_trend_outlook(
+            trend=trend,
+            current=current,
+            sma20=sma20,
+            sma60=sma60,
+            price_unit=price_unit,
+            asset_type=asset_type,
+            volume_signal=volume_signal,
+            investor_summary=investor_summary,
+        )
+        action_plan = self._build_action_plan(
+            trend=trend,
+            bias=bias,
+            first_buy=first_buy,
+            second_buy=second_buy,
+            first_sell=first_sell,
+            second_sell=second_sell,
+            price_unit=price_unit,
+            asset_type=asset_type,
+        )
+        buy_plan = self._build_buy_plan(first_buy, second_buy, price_unit, asset_type, trend)
+        sell_plan = self._build_sell_plan(first_sell, second_sell, price_unit, asset_type, trend)
+        loss_cut_plan = self._build_loss_cut_plan(stop_loss, price_unit, asset_type)
+        risk_notes = self._build_risk_notes(
+            trend=trend,
+            rsi14=rsi14,
+            macd_hist=macd_hist,
+            atr14=atr14,
+            volume_ratio=volume_ratio,
+            investor_flow=investor_flow,
+            news_context=news_context,
+        )
+        notes = self._build_reason_notes(
+            trend=trend,
+            sma20=sma20,
+            sma60=sma60,
+            high20=high20,
+            low20=low20,
+            price_unit=price_unit,
+            asset_type=asset_type,
+            volume_signal=volume_signal,
+            rsi14=rsi14,
+            macd_hist=macd_hist,
+            investor_summary=investor_summary,
+            news_brief=news_brief,
+            profile=profile,
+        )
 
         return {
             "asset_type": asset_type,
@@ -489,18 +526,16 @@ class AnalysisService:
             "stop_loss": round(stop_loss, 4),
             "confidence_score": confidence_score,
             "confidence_label": confidence_label,
-            "volume_ratio": round(volume_ratio, 2) if volume_ratio is not None else None,
-            "volume_signal": volume_signal,
-            "rsi14": round(rsi14, 2) if rsi14 is not None else None,
-            "macd": round(macd_line, 4) if macd_line is not None else None,
-            "macd_signal": round(macd_signal, 4) if macd_signal is not None else None,
-            "macd_histogram": round(macd_hist, 4) if macd_hist is not None else None,
-            "atr14": round(atr14, 4) if atr14 is not None else None,
-            "investor_flow": investor_flow,
-            "news_bias": news_context.get("news_bias"),
-            "market_context": news_context.get("summary"),
-            "related_headlines": news_context.get("related_headlines", []),
-            "macro_headlines": news_context.get("macro_headlines", []),
+            "summary_title": summary_title,
+            "summary_body": summary_body,
+            "trend_outlook": trend_outlook,
+            "action_plan": action_plan,
+            "buy_plan": buy_plan,
+            "sell_plan": sell_plan,
+            "loss_cut_plan": loss_cut_plan,
+            "investor_summary": investor_summary,
+            "news_brief": news_brief,
+            "risk_notes": risk_notes,
             "timeframe": timeframe,
             "source": source,
             "notes": notes,
@@ -609,6 +644,214 @@ class AnalysisService:
         return "낮음"
 
     @staticmethod
+    def _summarize_investor_flow(investor_flow: Optional[Dict]) -> Optional[str]:
+        if not investor_flow:
+            return None
+        if investor_flow.get("market_scope") == "domestic":
+            return investor_flow.get("summary")
+        if investor_flow.get("market_scope") == "global":
+            flow_label = investor_flow.get("flow_label", "혼조")
+            ratio = investor_flow.get("up_down_volume_ratio")
+            ratio_text = f"상승 거래량 우위 {ratio:.2f}배" if ratio is not None else "거래량 비율 확인 불가"
+            return f"해외 수급 추정은 {flow_label}이며, {ratio_text} 흐름입니다."
+        return None
+
+    @staticmethod
+    def _build_summary_title(trend: str, bias: str, confidence_label: str) -> str:
+        if trend == "상승":
+            return f"{confidence_label} 신뢰도의 상승 추세 대응 구간입니다."
+        if trend == "하락":
+            return f"{confidence_label} 신뢰도의 보수적 대응 구간입니다."
+        if bias == "박스권 대응":
+            return f"{confidence_label} 신뢰도의 방향 확인 구간입니다."
+        return f"{confidence_label} 신뢰도의 중립 구간입니다."
+
+    @staticmethod
+    def _build_summary_body(
+        trend: str,
+        bias: str,
+        timeframe: str,
+        volume_signal: str,
+        investor_summary: Optional[str],
+        news_brief: Optional[str],
+    ) -> str:
+        segments = [f"{timeframe} 기준으로 현재 흐름은 {trend} 쪽입니다."]
+        if bias:
+            segments.append(f"기본 대응은 {bias} 관점으로 보시면 됩니다.")
+        if volume_signal and volume_signal != "데이터 없음":
+            segments.append(f"거래량은 {volume_signal} 흐름입니다.")
+        if investor_summary:
+            segments.append(investor_summary)
+        if news_brief:
+            segments.append(news_brief)
+        return " ".join(segments)
+
+    def _build_trend_outlook(
+        self,
+        trend: str,
+        current: float,
+        sma20: float,
+        sma60: float,
+        price_unit: str,
+        asset_type: str,
+        volume_signal: str,
+        investor_summary: Optional[str],
+    ) -> str:
+        average_desc = (
+            f"단기 평균은 {self._fmt(sma20, price_unit, asset_type)}, 중기 평균은 {self._fmt(sma60, price_unit, asset_type)} 수준입니다."
+        )
+        if trend == "상승":
+            base = f"현재가는 주요 평균선 위에서 움직이고 있어 추세 훼손 전까지는 상승 흐름을 우선 봅니다. {average_desc}"
+        elif trend == "하락":
+            base = f"현재가는 주요 평균선 아래에 머물러 있어 반등이 나오더라도 보수적으로 보시는 편이 좋습니다. {average_desc}"
+        else:
+            base = f"현재가는 주요 평균선 근처에서 방향성이 엇갈리고 있어 추세 확인이 더 필요합니다. {average_desc}"
+
+        if volume_signal and volume_signal != "데이터 없음":
+            base += f" 거래량은 {volume_signal} 흐름입니다."
+        if investor_summary:
+            base += f" 수급 해석은 {investor_summary}"
+        return base
+
+    def _build_action_plan(
+        self,
+        trend: str,
+        bias: str,
+        first_buy: float,
+        second_buy: float,
+        first_sell: float,
+        second_sell: float,
+        price_unit: str,
+        asset_type: str,
+    ) -> str:
+        if trend == "상승":
+            return (
+                f"추격 매수보다는 {self._fmt(first_buy, price_unit, asset_type)} 부근 조정 시 1차 대응을 보고, "
+                f"흐름이 더 눌리면 {self._fmt(second_buy, price_unit, asset_type)} 부근까지 분할 접근하는 전략이 적절합니다. "
+                f"반등 시에는 {self._fmt(first_sell, price_unit, asset_type)}와 {self._fmt(second_sell, price_unit, asset_type)}를 차례로 확인합니다."
+            )
+        if trend == "하락":
+            return (
+                f"성급한 진입보다는 추세 안정 여부를 먼저 확인하시고, 들어가더라도 {self._fmt(first_buy, price_unit, asset_type)}와 "
+                f"{self._fmt(second_buy, price_unit, asset_type)}를 분할 기준으로만 짧게 대응하는 편이 안전합니다."
+            )
+        return (
+            f"방향성이 아직 뚜렷하지 않아 {self._fmt(first_buy, price_unit, asset_type)}와 {self._fmt(first_sell, price_unit, asset_type)} "
+            f"사이의 박스권 대응으로 접근하시고, 이탈 시에는 다음 구간 {self._fmt(second_buy, price_unit, asset_type)} 또는 "
+            f"{self._fmt(second_sell, price_unit, asset_type)}를 새 기준으로 보시면 됩니다."
+        )
+
+    def _build_buy_plan(self, first_buy: float, second_buy: float, price_unit: str, asset_type: str, trend: str) -> str:
+        prefix = "눌림목 관점" if trend == "상승" else "보수적 분할 관점"
+        return (
+            f"{prefix}에서 1차 매수는 {self._fmt(first_buy, price_unit, asset_type)}, "
+            f"2차 매수는 {self._fmt(second_buy, price_unit, asset_type)}를 기준으로 보시면 됩니다."
+        )
+
+    def _build_sell_plan(self, first_sell: float, second_sell: float, price_unit: str, asset_type: str, trend: str) -> str:
+        prefix = "상승 흐름 이익 실현" if trend == "상승" else "기술적 반등 정리"
+        return (
+            f"{prefix} 구간은 1차 {self._fmt(first_sell, price_unit, asset_type)}, "
+            f"2차 {self._fmt(second_sell, price_unit, asset_type)}입니다."
+        )
+
+    def _build_loss_cut_plan(self, stop_loss: float, price_unit: str, asset_type: str) -> str:
+        return f"손절 기준은 {self._fmt(stop_loss, price_unit, asset_type)} 이탈 여부입니다. 이 구간 아래에서는 대응 강도를 낮추는 편이 좋습니다."
+
+    @staticmethod
+    def _build_risk_notes(
+        trend: str,
+        rsi14: Optional[float],
+        macd_hist: Optional[float],
+        atr14: Optional[float],
+        volume_ratio: Optional[float],
+        investor_flow: Optional[Dict],
+        news_context: Dict,
+    ) -> List[str]:
+        risks: List[str] = []
+
+        if rsi14 is not None and rsi14 >= 70:
+            risks.append("단기 과열 신호가 있어 추격 매수는 부담이 될 수 있습니다.")
+        elif rsi14 is not None and rsi14 <= 30:
+            risks.append("낙폭은 커졌지만 추세 반전 확인 전까지는 저가 매수도 신중해야 합니다.")
+
+        if macd_hist is not None and macd_hist < 0:
+            risks.append("모멘텀이 완전히 회복되지 않아 반등 후 다시 흔들릴 수 있습니다.")
+
+        if atr14 is not None and atr14 > 0:
+            risks.append("변동성이 살아 있어 가격이 빠르게 흔들릴 수 있습니다.")
+
+        if volume_ratio is not None and volume_ratio <= 0.7:
+            risks.append("거래 참여가 약해 반등 탄력이 제한될 수 있습니다.")
+
+        if trend == "하락":
+            risks.append("하락 추세 구간에서는 지지선 이탈 시 낙폭이 빠르게 커질 수 있습니다.")
+
+        if investor_flow:
+            if investor_flow.get("market_scope") == "domestic":
+                foreign_direction = investor_flow.get("foreign_direction")
+                institution_direction = investor_flow.get("institution_direction")
+                if foreign_direction == institution_direction == "순매도":
+                    risks.append("외국인과 기관이 함께 매도 우위라면 단기 반등의 지속성이 약할 수 있습니다.")
+            elif investor_flow.get("market_scope") == "global" and investor_flow.get("flow_label") == "유출 우위":
+                risks.append("해외 수급 추정상 자금 유출 우위라 단기 추세가 쉽게 꺾일 수 있습니다.")
+
+        news_summary = news_context.get("summary")
+        if news_context.get("news_bias") == "부담" and news_summary:
+            risks.append(news_summary)
+        elif news_context.get("news_bias") == "중립" and news_summary:
+            risks.append("뉴스 흐름은 아직 방향을 강하게 밀어주지 않고 있습니다.")
+
+        return list(dict.fromkeys(risks))[:4]
+
+    def _build_reason_notes(
+        self,
+        trend: str,
+        sma20: float,
+        sma60: float,
+        high20: float,
+        low20: float,
+        price_unit: str,
+        asset_type: str,
+        volume_signal: str,
+        rsi14: Optional[float],
+        macd_hist: Optional[float],
+        investor_summary: Optional[str],
+        news_brief: Optional[str],
+        profile: Dict[str, float],
+    ) -> List[str]:
+        reasons = [
+            f"{profile['primary_label']} 평균과 {profile['secondary_label']} 평균 위치로 추세 방향을 판단했습니다.",
+            f"최근 핵심 가격대는 고점 {self._fmt(high20, price_unit, asset_type)}와 저점 {self._fmt(low20, price_unit, asset_type)}입니다.",
+        ]
+
+        if volume_signal and volume_signal != "데이터 없음":
+            reasons.append(f"거래량은 현재 {volume_signal} 흐름으로 해석했습니다.")
+
+        if rsi14 is not None:
+            if rsi14 >= 70:
+                reasons.append("보조지표상 단기 과열 구간에 가까워 추격 매수는 불리할 수 있습니다.")
+            elif rsi14 <= 30:
+                reasons.append("보조지표상 과매도 구간에 가까워 낙폭 둔화 가능성을 함께 봤습니다.")
+            else:
+                reasons.append("보조지표는 과열도 과매도도 아닌 중립권으로 봤습니다.")
+
+        if macd_hist is not None:
+            if macd_hist > 0:
+                reasons.append("모멘텀은 완만하게 개선되는 쪽으로 반영했습니다.")
+            elif macd_hist < 0:
+                reasons.append("모멘텀은 아직 약한 편으로 반영했습니다.")
+
+        if investor_summary:
+            reasons.append(investor_summary)
+        if news_brief:
+            reasons.append(news_brief)
+        if trend == "횡보":
+            reasons.append("방향성이 약해 지지·저항 이탈 여부를 더 중요하게 봤습니다.")
+
+        return reasons[:5]
+
+    @staticmethod
     def _calculate_rsi(closes: List[float], period: int) -> Optional[float]:
         if len(closes) <= period:
             return None
@@ -686,18 +929,18 @@ class AnalysisService:
     @staticmethod
     def _extract_macro_signals(articles: List[Dict[str, str]], asset_type: str) -> List[Dict[str, int]]:
         keyword_scores = {
-            "rate": -1,
-            "inflation": -1,
-            "tariff": -1,
-            "war": -2,
-            "oil": -1 if asset_type == "stock" else 0,
-            "fed": -1,
-            "treasury": -1,
-            "stimulus": 1,
-            "ai": 1,
-            "chip": 1,
-            "soft landing": 1,
-            "cut": 1,
+            "rate": ("금리 경계", -1),
+            "inflation": ("물가 부담", -1),
+            "tariff": ("관세 이슈", -1),
+            "war": ("지정학 불안", -2),
+            "oil": ("유가 변동성", -1 if asset_type == "stock" else 0),
+            "fed": ("미국 통화정책 경계", -1),
+            "treasury": ("국채금리 변동성", -1),
+            "stimulus": ("경기부양 기대", 1),
+            "ai": ("인공지능 수요 기대", 1),
+            "chip": ("반도체 수요 기대", 1),
+            "soft landing": ("연착륙 기대", 1),
+            "cut": ("정책 완화 기대", 1),
         }
 
         signals: List[Dict[str, int]] = []
@@ -705,13 +948,13 @@ class AnalysisService:
             combined = f"{article['title']} {article['summary']}".lower()
             score = 0
             matched = []
-            for keyword, keyword_score in keyword_scores.items():
+            for keyword, (label, keyword_score) in keyword_scores.items():
                 if keyword in combined:
                     score += keyword_score
-                    matched.append(keyword)
+                    matched.append(label)
             if score == 0:
                 continue
-            signals.append({"headline": article["title"], "score": score, "keywords": ",".join(matched)})
+            signals.append({"label": ", ".join(list(dict.fromkeys(matched))[:2]), "score": score})
         return signals
 
     @staticmethod
@@ -735,14 +978,23 @@ class AnalysisService:
         asset_type: str,
     ) -> str:
         if related_articles:
-            lead = "종목 관련 최신 뉴스"
+            lead = "관련 뉴스 흐름"
         elif asset_type == "currency":
-            lead = "환율 관련 거시 뉴스"
+            lead = "환율 거시 환경"
         else:
-            lead = "시장 거시 뉴스"
+            lead = "시장 뉴스 흐름"
 
-        macro_hint = ""
         if macro_signals:
-            macro_hint = f" 거시 변수는 {', '.join(signal['headline'] for signal in macro_signals[:2])} 중심으로 반영했습니다."
+            macro_labels = ", ".join(signal["label"] for signal in macro_signals[:2] if signal.get("label"))
+            if macro_labels:
+                if bias == "우호적":
+                    return f"{lead}은 대체로 우호적이며, {macro_labels} 요인이 심리를 지지하고 있습니다."
+                if bias == "부담":
+                    return f"{lead}은 대체로 부담이며, {macro_labels} 요인이 단기 변동성을 키울 수 있습니다."
+                return f"{lead}은 뚜렷한 방향성은 없지만, {macro_labels} 이슈는 함께 확인할 필요가 있습니다."
 
-        return f"{lead} 기준으로 현재 뉴스 영향은 {bias} 쪽으로 해석됩니다.{macro_hint}"
+        if bias == "우호적":
+            return f"{lead}은 전반적으로 우호적입니다."
+        if bias == "부담":
+            return f"{lead}은 전반적으로 부담 요인에 가깝습니다."
+        return f"{lead}은 아직 중립적인 수준입니다."
