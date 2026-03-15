@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#112b1f" />
+    <meta name="theme-color" content="#3182f6" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="주식 알림" />
@@ -20,12 +20,12 @@
     </div>
     <div class="app-shell">
       <header class="topbar">
-        <div>
+        <div class="topbar-brand">
           <p class="eyebrow">내 시장 보드</p>
           <h1>주식 알림</h1>
         </div>
         <div class="topbar-actions">
-          <button id="install-button" class="ghost-button hidden" type="button">홈 화면 추가</button>
+          <button id="install-button" class="ghost-button hidden" type="button">설치</button>
           <button id="logout-button" class="ghost-button hidden" type="button">로그아웃</button>
         </div>
       </header>
@@ -95,10 +95,7 @@
                       </select>
                     </label>
                   </form>
-                  <div id="fx-result" class="empty-state">환율을 조회하면 여기에 표시됩니다.</div>
-                  <div class="callout compact-callout">
-                    저장한 관심환율은 여기서 바로 상세분석, 알림, 삭제를 관리합니다.
-                  </div>
+                  <div id="fx-result" class="empty-state">조회 결과가 없습니다.</div>
                   <ul id="fx-watchlist-list" class="resource-list scroll-area tall"></ul>
                 </article>
 
@@ -108,9 +105,6 @@
                       <p class="eyebrow">관심종목</p>
                       <h3>주식 찾기</h3>
                     </div>
-                  </div>
-                  <div class="callout compact-callout">
-                    종목 검색으로 관심주식을 추가하고, 관심종목 탭에서 상세분석과 알림을 관리할 수 있습니다.
                   </div>
                   <div class="quick-actions">
                     <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
@@ -128,9 +122,6 @@
                     <h3>관심주식</h3>
                   </div>
                   <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
-                </div>
-                <div class="callout compact-callout">
-                  한글 종목명, 영문명, 티커, 숫자 코드로 검색해서 추가하고, 각 항목의 <strong>상세분석</strong> 또는 <strong>알림</strong> 버튼으로 관리하실 수 있습니다.
                 </div>
                 <ul id="watchlist-list" class="resource-list scroll-area tall"></ul>
               </div>
@@ -150,19 +141,6 @@
                       iPhone에서는 Safari의 공유 메뉴에서 <strong>홈 화면에 추가</strong>를 누르면 앱처럼 실행할 수 있습니다.
                     </div>
                     <button id="settings-install-button" class="primary-button hidden" type="button">이 기기에 설치</button>
-                  </div>
-                </article>
-
-                <article class="panel-card">
-                  <div class="panel-head">
-                    <div>
-                      <p class="eyebrow">세션</p>
-                      <h3>접속 상태</h3>
-                    </div>
-                  </div>
-                  <div class="stack">
-                    <div id="session-status" class="callout success">로그인 세션이 활성화되어 있습니다.</div>
-                    <button id="settings-logout-button" class="ghost-button" type="button">로그아웃</button>
                   </div>
                 </article>
 

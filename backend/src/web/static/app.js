@@ -33,7 +33,6 @@ const elements = {
   loginForm: document.getElementById("login-form"),
   loginError: document.getElementById("login-error"),
   logoutButton: document.getElementById("logout-button"),
-  settingsLogoutButton: document.getElementById("settings-logout-button"),
   installButton: document.getElementById("install-button"),
   settingsInstallButton: document.getElementById("settings-install-button"),
   watchlistList: document.getElementById("watchlist-list"),
@@ -237,12 +236,6 @@ function setView(name) {
   window.location.hash = nextView;
 }
 
-function getCurrencyAlertCount(base, target) {
-  return state.currencyAlerts.filter(
-    (item) => item.base_currency === base && item.target_currency === target
-  ).length;
-}
-
 function stockQuoteMarkup(symbol) {
   const quote = state.stockQuotes[symbol];
   if (!quote) {
@@ -301,7 +294,7 @@ function renderSwipeCard({ id, body, actions, extraClass = "" }) {
 function renderStockWatchlist() {
   if (!state.watchlist.length) {
     elements.watchlistList.innerHTML =
-      `<li class="empty-state">아직 관심종목이 없습니다. 종목 검색으로 먼저 추가해 주세요.</li>`;
+      `<li class="empty-state">저장된 관심종목이 없습니다.</li>`;
     return;
   }
 
@@ -321,7 +314,7 @@ function renderStockWatchlist() {
               </div>
             `,
             actions: `
-              <button class="ghost-button small" type="button" data-action="open-stock-analysis" data-symbol="${escapeHtml(item.symbol)}" data-market="${escapeHtml(market)}">상세분석</button>
+              <button class="ghost-button small" type="button" data-action="open-stock-analysis" data-symbol="${escapeHtml(item.symbol)}" data-market="${escapeHtml(market)}">분석</button>
               <button class="ghost-button small" type="button" data-action="open-alert-modal" data-symbol="${escapeHtml(item.symbol)}">알림</button>
               <button class="danger-button" type="button" data-action="delete-watchlist" data-symbol="${escapeHtml(item.symbol)}">삭제</button>
             `,
@@ -337,14 +330,13 @@ function renderStockWatchlist() {
 function renderFxWatchlist() {
   if (!state.fxWatchlist.length) {
     elements.fxWatchlistList.innerHTML =
-      `<li class="empty-state">관심환율이 없습니다. USD/KRW 같은 페어를 저장해 주세요.</li>`;
+      `<li class="empty-state">저장된 관심환율이 없습니다.</li>`;
     return;
   }
 
   elements.fxWatchlistList.innerHTML = state.fxWatchlist
     .map((item) => {
       const pair = `${item.base}/${item.target}`;
-      const alertCount = getCurrencyAlertCount(item.base, item.target);
       return `
         <li>
           ${renderSwipeCard({
@@ -354,12 +346,11 @@ function renderFxWatchlist() {
                 <div class="resource-meta">
                   <strong class="resource-title">${escapeHtml(pair)}</strong>
                   ${fxRateMarkup(item.base, item.target)}
-                  <small class="meta-line">설정된 환율 알림 ${alertCount}개</small>
                 </div>
               </div>
             `,
             actions: `
-              <button class="ghost-button small" type="button" data-action="open-fx-analysis" data-base="${escapeHtml(item.base)}" data-target="${escapeHtml(item.target)}">상세분석</button>
+              <button class="ghost-button small" type="button" data-action="open-fx-analysis" data-base="${escapeHtml(item.base)}" data-target="${escapeHtml(item.target)}">분석</button>
               <button class="ghost-button small" type="button" data-action="open-fx-alert-modal" data-base="${escapeHtml(item.base)}" data-target="${escapeHtml(item.target)}">알림</button>
               <button class="danger-button" type="button" data-action="delete-fx-watchlist" data-base="${escapeHtml(item.base)}" data-target="${escapeHtml(item.target)}">삭제</button>
             `,
@@ -522,9 +513,9 @@ function renderCurrentFxResult(payload) {
       </div>
     `,
     actions: `
-      <button class="ghost-button small" type="button" data-action="add-current-fx-pair">현재 페어 저장</button>
-      <button class="ghost-button small" type="button" data-action="open-current-fx-analysis">상세분석</button>
-      <button class="ghost-button small" type="button" data-action="open-current-fx-alert">알림 추가</button>
+      <button class="ghost-button small" type="button" data-action="add-current-fx-pair">저장</button>
+      <button class="ghost-button small" type="button" data-action="open-current-fx-analysis">분석</button>
+      <button class="ghost-button small" type="button" data-action="open-current-fx-alert">알림</button>
     `,
   });
   bindSwipeCards();
@@ -1486,7 +1477,6 @@ elements.fxBaseSelect.addEventListener("change", handleFxSelectionChange);
 elements.fxTargetSelect.addEventListener("change", handleFxSelectionChange);
 elements.loginForm.addEventListener("submit", handleLogin);
 elements.logoutButton.addEventListener("click", handleLogout);
-elements.settingsLogoutButton.addEventListener("click", handleLogout);
 elements.refreshDashboard.addEventListener("click", async () => {
   await withButtonBusy(elements.refreshDashboard, "새로고침 중...", async () => {
     await refreshData();
