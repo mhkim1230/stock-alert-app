@@ -165,9 +165,15 @@ function formatRate(value, unit) {
 }
 
 function formatChangePercent(value) {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
     return "";
+  }
+  if (numeric === 0) {
+    return "보합";
   }
   return `${numeric > 0 ? "+" : ""}${numeric.toFixed(2)}%`;
 }
@@ -826,9 +832,9 @@ function renderStockSearchResults(results) {
       (item) => `
         <li class="resource-item quote-item">
           <div class="resource-meta">
-            <strong>${item.symbol} · ${item.name}</strong>
-            <small>${item.market || "-"} · ${formatPrice(item.price, item.currency || "KRW")}</small>
-            <small>${formatChangePercent(item.change_percent)} · ${item.source}</small>
+            <strong class="resource-title">${item.symbol} · ${item.name}</strong>
+            <small class="meta-line">${item.market || "-"} · ${formatPrice(item.price, item.currency || "KRW")}</small>
+            <small class="meta-line">${formatChangePercent(item.change_percent) || "등락률 정보 없음"} · ${item.source}</small>
           </div>
           <div class="resource-actions">
             <button class="primary-button small-button" type="button" data-action="add-watchlist-symbol" data-symbol="${item.symbol}">추가</button>

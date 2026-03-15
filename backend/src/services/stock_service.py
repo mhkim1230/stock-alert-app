@@ -1,5 +1,6 @@
 import logging
 from typing import Any, Dict, List, Optional
+import asyncio
 
 from src.services.naver_stock_service import NaverStockService
 
@@ -30,7 +31,7 @@ class StockService:
                     "source": item.get("source", "naver"),
                 }
             )
-        return normalized
+        return await self._enrich_missing_domestic_change(normalized)
 
     async def get_stock_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
         results = await self.search_stocks(symbol)
@@ -38,6 +39,21 @@ class StockService:
             if item["symbol"].upper() == symbol.upper():
                 return item
         return results[0] if results else None
+
+    async def _enrich_missing_domestic_change(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        async def enrich(item: Dict[str, Any]) -> Dict[str, Any]:
+            symbol = str(item.get("symbol") or "")
+            if not symbol.isdigit() or item.get("change_percent") is not None:
+                return item
+            detailed = await self.naver._get_korean_stock_by_code(symbol)
+            if detailed and detailed.get("change_percent") is not None:
+                item["change_percent"] = self._coerce_float(detailed.get("change_percent"))
+                item["source"] = detailed.get("source", item.get("source", "naver"))
+            return item
+
+        if not items:
+            return items
+        return await asyncio.gather(*(enrich(item) for item in items))
 
     @staticmethod
     def _coerce_float(value: Any) -> Optional[float]:

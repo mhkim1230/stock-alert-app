@@ -177,11 +177,13 @@ a {
   font-size: 0.76rem;
   font-weight: 700;
   white-space: nowrap;
+  line-height: 1.2;
 }
 
 .ghost-button.small {
   padding: 6px 8px;
   font-size: 0.7rem;
+  line-height: 1.2;
 }
 
 .icon-button {
@@ -202,6 +204,7 @@ a {
   font-size: 0.78rem;
   font-weight: 700;
   box-shadow: 0 12px 24px rgba(49, 130, 246, 0.22);
+  line-height: 1.2;
 }
 
 .danger-button {
@@ -211,6 +214,7 @@ a {
   font-size: 0.7rem;
   font-weight: 700;
   white-space: nowrap;
+  line-height: 1.2;
 }
 
 button:hover {
@@ -492,6 +496,8 @@ button:disabled {
   font-size: 0.82rem;
   line-height: 1.15;
   letter-spacing: -0.03em;
+  white-space: normal;
+  word-break: keep-all;
 }
 
 .meta-line {
@@ -535,6 +541,19 @@ button:disabled {
 .compact-actions-row {
   justify-content: flex-end;
   align-items: center;
+}
+
+.resource-actions {
+  align-items: center;
+}
+
+.resource-actions .primary-button,
+.resource-actions .ghost-button,
+.resource-actions .danger-button {
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  display: inline-flex;
 }
 
 .timeline-item,
@@ -1035,6 +1054,19 @@ button:disabled {
   .compact-actions-row {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .resource-actions {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .resource-actions .primary-button,
+  .resource-actions .ghost-button,
+  .resource-actions .danger-button {
+    min-height: 34px;
+    padding-inline: 10px;
+    font-size: 0.74rem;
   }
 
   .quote-line {
