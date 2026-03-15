@@ -1028,7 +1028,8 @@ button:disabled {
 
   .analysis-range-switch {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    top: calc(env(safe-area-inset-top) + 76px);
+    top: calc(env(safe-area-inset-top) + 84px);
+    margin-top: 2px;
     gap: 3px;
     padding: 3px;
   }

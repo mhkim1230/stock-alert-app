@@ -946,6 +946,18 @@ class AnalysisService:
             "inflation": ("물가 부담", -1),
             "tariff": ("관세 이슈", -1),
             "war": ("지정학 불안", -2),
+            "attack": ("지정학 불안", -2),
+            "missile": ("지정학 불안", -2),
+            "drone": ("지정학 불안", -2),
+            "conflict": ("지정학 불안", -2),
+            "ceasefire": ("중동 긴장", -1),
+            "ukraine": ("우크라이나 전쟁", -2),
+            "russia": ("우크라이나 전쟁", -2),
+            "gaza": ("중동 전쟁", -2),
+            "israel": ("중동 전쟁", -2),
+            "iran": ("중동 긴장", -2),
+            "red sea": ("중동 긴장", -2),
+            "sanction": ("제재 리스크", -1),
             "oil": ("유가 변동성", -1 if asset_type == "stock" else 0),
             "fed": ("미국 통화정책 경계", -1),
             "treasury": ("국채금리 변동성", -1),
@@ -973,7 +985,28 @@ class AnalysisService:
     @staticmethod
     def _score_articles(articles: List[Dict[str, str]], asset_type: str) -> int:
         positive_words = ["beat", "surge", "growth", "partnership", "record", "gain", "rally", "strong"]
-        negative_words = ["fall", "drop", "delay", "risk", "probe", "cut", "warn", "miss", "tariff", "war"]
+        negative_words = [
+            "fall",
+            "drop",
+            "delay",
+            "risk",
+            "probe",
+            "cut",
+            "warn",
+            "miss",
+            "tariff",
+            "war",
+            "attack",
+            "missile",
+            "drone",
+            "conflict",
+            "ukraine",
+            "russia",
+            "gaza",
+            "israel",
+            "iran",
+            "sanction",
+        ]
         score = 0
         for article in articles:
             combined = f"{article['title']} {article['summary']}".lower()
