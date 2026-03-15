@@ -267,7 +267,7 @@ button:disabled {
 }
 
 .inline-form {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
 }
 
@@ -355,6 +355,52 @@ button:disabled {
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
+}
+
+.swipe-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  --swipe-offset: 0px;
+}
+
+.swipe-actions {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 208px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+  padding: 10px;
+  background: linear-gradient(90deg, rgba(244, 247, 251, 0) 0%, rgba(244, 247, 251, 0.95) 12%, rgba(244, 247, 251, 1) 100%);
+}
+
+.swipe-actions .ghost-button,
+.swipe-actions .danger-button {
+  height: 100%;
+  border-radius: 18px;
+  white-space: nowrap;
+}
+
+.swipe-surface {
+  position: relative;
+  z-index: 1;
+  transform: translateX(var(--swipe-offset));
+  transition: transform 180ms ease;
+  touch-action: pan-y;
+}
+
+.swipe-card.open .swipe-surface {
+  transform: translateX(-208px);
+}
+
+.swipe-card.dragging .swipe-surface {
+  transition: none;
+}
+
+.swipe-item-content {
+  min-height: 100%;
 }
 
 .quote-item {
@@ -539,7 +585,7 @@ button:disabled {
 }
 
 .analysis-modal {
-  padding: 8px;
+  padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
   align-items: stretch;
 }
 
@@ -571,8 +617,8 @@ button:disabled {
 .analysis-modal-card {
   padding-top: 0;
   width: min(980px, 100%);
-  max-height: calc(100dvh - 16px);
-  height: calc(100dvh - 16px);
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
+  height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
   border-radius: 34px;
 }
 
@@ -581,7 +627,7 @@ button:disabled {
   top: 0;
   z-index: 2;
   margin: 0 -18px 12px;
-  padding: 18px 18px 12px;
+  padding: calc(env(safe-area-inset-top) + 18px) 18px 12px;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
@@ -615,34 +661,27 @@ button:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 12px;
+  padding: 4px;
+  border-radius: 18px;
+  background: rgba(23, 34, 52, 0.06);
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + 104px);
+  z-index: 1;
 }
 
-.analysis-range-option {
-  position: relative;
-  display: block;
-}
-
-.analysis-range-option input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-}
-
-.analysis-range-option span {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: #fff;
+.analysis-range-tab {
+  border: none;
+  border-radius: 14px;
+  background: transparent;
   color: var(--muted);
+  padding: 11px 12px;
+  font-weight: 700;
 }
 
-.analysis-range-option input:checked + span {
-  background: var(--navy);
-  color: #fff;
-  border-color: var(--navy);
+.analysis-range-tab.active {
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 6px 14px rgba(23, 34, 52, 0.08);
 }
 
 .analysis-body {
@@ -829,7 +868,7 @@ button:disabled {
 
   .modal-sticky-head {
     margin: 0 -14px 12px;
-    padding: 14px 14px 10px;
+    padding: calc(env(safe-area-inset-top) + 14px) 14px 10px;
   }
 
   .analysis-modal {
@@ -842,6 +881,10 @@ button:disabled {
     max-height: 100dvh;
     border-radius: 0;
     border: none;
+  }
+
+  .analysis-range-switch {
+    top: calc(env(safe-area-inset-top) + 112px);
   }
 
   .analysis-header-side {

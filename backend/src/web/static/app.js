@@ -1,4 +1,6 @@
 const FX_WATCHLIST_KEY = "stock-alert-fx-watchlist-v1";
+const FX_OPTIONS = ["USD", "KRW", "JPY", "EUR", "CNY", "GBP", "HKD", "AUD"];
+const SWIPE_ACTION_WIDTH = 208;
 
 const state = {
   watchlist: [],
@@ -15,6 +17,7 @@ const state = {
   selectedFxPair: null,
   lastFxLookup: { base: "USD", target: "KRW" },
   analysisContext: null,
+  openSwipeId: "",
 };
 
 const loadingState = {
@@ -38,6 +41,9 @@ const elements = {
   settingsNotifications: document.getElementById("settings-notifications"),
   stockSearchResults: document.getElementById("stock-search-results"),
   fxResult: document.getElementById("fx-result"),
+  fxForm: document.getElementById("fx-form"),
+  fxBaseSelect: document.getElementById("fx-base-select"),
+  fxTargetSelect: document.getElementById("fx-target-select"),
   refreshDashboard: document.getElementById("refresh-dashboard"),
   stockSearchModal: document.getElementById("stock-search-modal"),
   stockSearchQuery: document.getElementById("stock-search-query"),
@@ -187,6 +193,15 @@ function formatChangePercent(value) {
   return `${numeric > 0 ? "+" : ""}${numeric.toFixed(2)}%`;
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function toLocalDate(value) {
   if (!value) {
     return "-";
@@ -261,6 +276,28 @@ function renderStats() {
   return;
 }
 
+function setOpenSwipe(id = "") {
+  state.openSwipeId = state.openSwipeId === id ? "" : id;
+}
+
+function closeSwipeActions() {
+  state.openSwipeId = "";
+}
+
+function renderSwipeCard({ id, body, actions, extraClass = "" }) {
+  const openedClass = state.openSwipeId === id ? " open" : "";
+  return `
+    <div class="swipe-card${openedClass}${extraClass ? ` ${extraClass}` : ""}" data-swipe-card="${id}">
+      <div class="swipe-actions">
+        ${actions}
+      </div>
+      <div class="swipe-surface" data-swipe-surface="${id}" role="button" tabindex="0" aria-expanded="${state.openSwipeId === id ? "true" : "false"}">
+        ${body}
+      </div>
+    </div>
+  `;
+}
+
 function renderStockWatchlist() {
   if (!state.watchlist.length) {
     elements.watchlistList.innerHTML =
@@ -272,20 +309,29 @@ function renderStockWatchlist() {
     .map((item) => {
       const market = state.stockQuotes[item.symbol]?.market || "";
       return `
-        <li class="resource-item quote-item">
-          <div class="resource-meta">
-            <strong class="resource-title">${item.symbol}</strong>
-            ${stockQuoteMarkup(item.symbol)}
-          </div>
-          <div class="resource-actions compact-actions-row">
-            <button class="ghost-button small" type="button" data-action="open-stock-analysis" data-symbol="${item.symbol}" data-market="${market}">상세분석</button>
-            <button class="ghost-button small" type="button" data-action="open-alert-modal" data-symbol="${item.symbol}">알림</button>
-            <button class="danger-button" type="button" data-action="delete-watchlist" data-symbol="${item.symbol}">삭제</button>
-          </div>
+        <li>
+          ${renderSwipeCard({
+            id: `stock:${item.symbol}`,
+            body: `
+              <div class="resource-item quote-item swipe-item-content">
+                <div class="resource-meta">
+                  <strong class="resource-title">${escapeHtml(item.symbol)}</strong>
+                  ${stockQuoteMarkup(item.symbol)}
+                </div>
+              </div>
+            `,
+            actions: `
+              <button class="ghost-button small" type="button" data-action="open-stock-analysis" data-symbol="${escapeHtml(item.symbol)}" data-market="${escapeHtml(market)}">상세분석</button>
+              <button class="ghost-button small" type="button" data-action="open-alert-modal" data-symbol="${escapeHtml(item.symbol)}">알림</button>
+              <button class="danger-button" type="button" data-action="delete-watchlist" data-symbol="${escapeHtml(item.symbol)}">삭제</button>
+            `,
+          })}
         </li>
       `;
     })
     .join("");
+
+  bindSwipeCards();
 }
 
 function renderFxWatchlist() {
@@ -300,21 +346,30 @@ function renderFxWatchlist() {
       const pair = `${item.base}/${item.target}`;
       const alertCount = getCurrencyAlertCount(item.base, item.target);
       return `
-        <li class="resource-item quote-item">
-          <div class="resource-meta">
-            <strong class="resource-title">${pair}</strong>
-            ${fxRateMarkup(item.base, item.target)}
-            <small class="meta-line">설정된 환율 알림 ${alertCount}개</small>
-          </div>
-          <div class="resource-actions compact-actions-row">
-            <button class="ghost-button small" type="button" data-action="open-fx-analysis" data-base="${item.base}" data-target="${item.target}">상세분석</button>
-            <button class="ghost-button small" type="button" data-action="open-fx-alert-modal" data-base="${item.base}" data-target="${item.target}">알림</button>
-            <button class="danger-button" type="button" data-action="delete-fx-watchlist" data-base="${item.base}" data-target="${item.target}">삭제</button>
-          </div>
+        <li>
+          ${renderSwipeCard({
+            id: `fx:${pair}`,
+            body: `
+              <div class="resource-item quote-item swipe-item-content">
+                <div class="resource-meta">
+                  <strong class="resource-title">${escapeHtml(pair)}</strong>
+                  ${fxRateMarkup(item.base, item.target)}
+                  <small class="meta-line">설정된 환율 알림 ${alertCount}개</small>
+                </div>
+              </div>
+            `,
+            actions: `
+              <button class="ghost-button small" type="button" data-action="open-fx-analysis" data-base="${escapeHtml(item.base)}" data-target="${escapeHtml(item.target)}">상세분석</button>
+              <button class="ghost-button small" type="button" data-action="open-fx-alert-modal" data-base="${escapeHtml(item.base)}" data-target="${escapeHtml(item.target)}">알림</button>
+              <button class="danger-button" type="button" data-action="delete-fx-watchlist" data-base="${escapeHtml(item.base)}" data-target="${escapeHtml(item.target)}">삭제</button>
+            `,
+          })}
         </li>
       `;
     })
     .join("");
+
+  bindSwipeCards();
 }
 
 function renderNotifications(listTarget, items = state.notifications) {
@@ -448,6 +503,35 @@ function setAnalysisHeader({ title = "상세분석", subtitle = "종목을 선�
   elements.analysisTitle.textContent = title;
   elements.analysisSubtitle.textContent = subtitle;
   elements.analysisPrice.textContent = price;
+}
+
+function renderCurrentFxResult(payload) {
+  const pair = `${payload.base_currency}/${payload.target_currency}`;
+  elements.fxResult.innerHTML = renderSwipeCard({
+    id: `lookup:${pair}`,
+    extraClass: "fx-result-swipe",
+    body: `
+      <div class="resource-item quote-item swipe-item-content">
+        <div class="resource-meta">
+          <strong class="resource-title">${escapeHtml(pair)}</strong>
+          <small class="meta-line">${escapeHtml(payload.source)}</small>
+          <div class="quote-line">
+            <span class="quote-price">${formatRate(payload.rate, payload.target_currency)}</span>
+          </div>
+        </div>
+      </div>
+    `,
+    actions: `
+      <button class="ghost-button small" type="button" data-action="add-current-fx-pair">현재 페어 저장</button>
+      <button class="ghost-button small" type="button" data-action="open-current-fx-analysis">상세분석</button>
+      <button class="ghost-button small" type="button" data-action="open-current-fx-alert">알림 추가</button>
+    `,
+  });
+  bindSwipeCards();
+}
+
+function renderFxSelectionError(message) {
+  elements.fxResult.innerHTML = `<div class="callout">${message}</div>`;
 }
 
 function renderAnalysis(data) {
@@ -611,6 +695,83 @@ async function migrateLegacyFxWatchlist() {
   }
 }
 
+function bindSwipeCards() {
+  document.querySelectorAll("[data-swipe-surface]").forEach((surface) => {
+    const cardId = surface.dataset.swipeSurface;
+    const card = surface.closest("[data-swipe-card]");
+    if (!card) {
+      return;
+    }
+
+    let startX = 0;
+    let currentX = 0;
+    let dragging = false;
+
+    const applyOffset = (value) => {
+      card.style.setProperty("--swipe-offset", `${value}px`);
+    };
+
+    const resetOffset = () => {
+      card.style.removeProperty("--swipe-offset");
+    };
+
+    surface.onpointerdown = (event) => {
+      if (event.pointerType === "mouse" && event.button !== 0) {
+        return;
+      }
+      startX = event.clientX;
+      currentX = event.clientX;
+      dragging = true;
+      card.classList.add("dragging");
+      surface.setPointerCapture?.(event.pointerId);
+    };
+
+    surface.onpointermove = (event) => {
+      if (!dragging) {
+        return;
+      }
+      currentX = event.clientX;
+      const delta = Math.max(-SWIPE_ACTION_WIDTH, Math.min(0, currentX - startX));
+      applyOffset(delta);
+    };
+
+    surface.onpointerup = (event) => {
+      if (!dragging) {
+        return;
+      }
+      dragging = false;
+      card.classList.remove("dragging");
+      resetOffset();
+      surface.releasePointerCapture?.(event.pointerId);
+      const delta = currentX - startX;
+      if (delta <= -52) {
+        state.openSwipeId = cardId;
+      } else if (delta >= 32) {
+        state.openSwipeId = "";
+      } else if (event.pointerType === "mouse") {
+        setOpenSwipe(cardId);
+      }
+      renderAll();
+    };
+
+    surface.onpointercancel = () => {
+      dragging = false;
+      card.classList.remove("dragging");
+      resetOffset();
+      renderAll();
+    };
+
+    surface.onkeydown = (event) => {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+      event.preventDefault();
+      setOpenSwipe(cardId);
+      renderAll();
+    };
+  });
+}
+
 function renderAll() {
   renderStats();
   renderStockWatchlist();
@@ -691,6 +852,7 @@ function showLoggedIn() {
 }
 
 function showLoggedOut() {
+  closeSwipeActions();
   elements.loginPanel.classList.remove("hidden");
   elements.appPanel.classList.add("hidden");
   elements.logoutButton.classList.add("hidden");
@@ -706,6 +868,7 @@ async function bootstrap() {
     await migrateLegacyFxWatchlist();
     showLoggedIn();
     await refreshData();
+    await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
   } catch {
     showLoggedOut();
   }
@@ -728,6 +891,7 @@ async function handleLogin(event) {
     form.reset();
     showLoggedIn();
     await refreshData();
+    await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
     showToast("로그인되었습니다.", "success");
   } catch (error) {
     elements.loginError.textContent = error.message;
@@ -759,6 +923,7 @@ function closeStockSearchModal() {
 }
 
 function openStockAlertModal(symbol, preset = null) {
+  closeSwipeActions();
   state.selectedAlertSymbol = symbol;
   elements.selectedAlertSymbol.textContent = symbol;
   prefillStockAlertForm(symbol, preset || {});
@@ -772,6 +937,7 @@ function closeStockAlertModal() {
 }
 
 function openFxAlertModal(base, target, preset = null) {
+  closeSwipeActions();
   state.selectedFxPair = { base, target };
   elements.selectedFxPair.textContent = `${base}/${target}`;
   prefillFxAlertForm(base, target, preset || {});
@@ -785,6 +951,7 @@ function closeFxAlertModal() {
 }
 
 function openAnalysisModal() {
+  closeSwipeActions();
   syncAnalysisRangeSwitch();
   elements.analysisModal.classList.remove("hidden");
 }
@@ -843,37 +1010,39 @@ async function handleStockSearch(event) {
 }
 
 async function handleFxLookup(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const formData = new FormData(form);
-  const base = String(formData.get("base")).toUpperCase();
-  const target = String(formData.get("target")).toUpperCase();
+  event?.preventDefault();
+  await handleFxSelectionChange();
+}
+
+async function handleFxLookupWithPair(base, target) {
   state.lastFxLookup = { base, target };
+  closeSwipeActions();
+
+  if (!FX_OPTIONS.includes(base) || !FX_OPTIONS.includes(target)) {
+    renderFxSelectionError("지원하지 않는 통화입니다.");
+    return;
+  }
+  if (base === target) {
+    renderFxSelectionError("같은 통화끼리는 조회할 수 없습니다.");
+    return;
+  }
 
   showLoadingCard(elements.fxResult, "환율을 조회하는 중입니다...");
   try {
-    await withFormBusy(form, "조회 중...", async () => {
-      const payload = await request(`/currency/rate?base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`, {
-        loadingMessage: "환율을 조회하는 중입니다...",
-      });
-      elements.fxResult.innerHTML = `
-        <div class="stat-card stat-card-action">
-          <small class="meta-line">${payload.source}</small>
-          <div class="quote-line">
-            <span class="quote-price">${payload.base_currency}/${payload.target_currency} ${formatRate(payload.rate, payload.target_currency)}</span>
-          </div>
-          <div class="resource-actions compact-actions">
-            <button class="ghost-button small inline-action-button" type="button" data-action="add-current-fx-pair">관심환율 추가</button>
-            <button class="ghost-button small inline-action-button" type="button" data-action="open-current-fx-analysis">상세분석</button>
-            <button class="ghost-button small inline-action-button" type="button" data-action="open-current-fx-alert">알림 추가</button>
-          </div>
-        </div>
-      `;
+    const payload = await request(`/currency/rate?base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`, {
+      loadingMessage: "환율을 조회하는 중입니다...",
     });
+    renderCurrentFxResult(payload);
   } catch (error) {
     showLoadingCard(elements.fxResult, error.message);
     showToast(error.message, "error");
   }
+}
+
+async function handleFxSelectionChange() {
+  const base = String(elements.fxBaseSelect.value).toUpperCase();
+  const target = String(elements.fxTargetSelect.value).toUpperCase();
+  await handleFxLookupWithPair(base, target);
 }
 
 async function handleFxWatchlistSubmit(event) {
@@ -1007,8 +1176,10 @@ async function openFxAnalysis(base, target) {
 
 function syncAnalysisRangeSwitch() {
   const current = state.analysisContext?.period || "short";
-  elements.analysisRangeSwitch.querySelectorAll("input[name='analysis-range']").forEach((input) => {
-    input.checked = input.value === current;
+  elements.analysisRangeSwitch.querySelectorAll(".analysis-range-tab").forEach((button) => {
+    const active = button.dataset.period === current;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
   });
 }
 
@@ -1064,6 +1235,18 @@ function setupEnterSubmit() {
 }
 
 async function handleListActions(event) {
+  const surface = event.target.closest("[data-swipe-surface]");
+  if (surface && !event.target.closest("[data-action]")) {
+    setOpenSwipe(surface.dataset.swipeSurface || "");
+    renderAll();
+    return;
+  }
+
+  if (!event.target.closest("[data-swipe-card]") && state.openSwipeId) {
+    closeSwipeActions();
+    renderAll();
+  }
+
   const trigger = event.target.closest("[data-action]");
   const action = trigger?.dataset.action;
   if (!action) {
@@ -1291,20 +1474,23 @@ document.getElementById("stock-search-modal").addEventListener("click", handleLi
 document.getElementById("stock-alert-modal").addEventListener("click", handleListActions);
 document.getElementById("fx-alert-modal").addEventListener("click", handleListActions);
 document.getElementById("analysis-modal").addEventListener("click", handleListActions);
-elements.analysisRangeSwitch.addEventListener("change", async (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement) || target.name !== "analysis-range" || !target.checked || !state.analysisContext) {
+elements.analysisRangeSwitch.addEventListener("click", async (event) => {
+  const target = event.target.closest(".analysis-range-tab");
+  if (!(target instanceof HTMLButtonElement) || !state.analysisContext) {
     return;
   }
-  state.analysisContext.period = target.value;
+  state.analysisContext.period = target.dataset.period;
   await loadCurrentAnalysis();
 });
+elements.fxBaseSelect.addEventListener("change", handleFxSelectionChange);
+elements.fxTargetSelect.addEventListener("change", handleFxSelectionChange);
 elements.loginForm.addEventListener("submit", handleLogin);
 elements.logoutButton.addEventListener("click", handleLogout);
 elements.settingsLogoutButton.addEventListener("click", handleLogout);
 elements.refreshDashboard.addEventListener("click", async () => {
   await withButtonBusy(elements.refreshDashboard, "새로고침 중...", async () => {
     await refreshData();
+    await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
   });
   showToast("데이터를 새로고침했습니다.", "success");
 });

@@ -70,19 +70,31 @@
                   <form id="fx-form" class="inline-form compact-form">
                     <label class="field">
                       <span>기준</span>
-                      <input name="base" value="USD" maxlength="3" required />
+                      <select id="fx-base-select" name="base" required>
+                        <option value="USD" selected>미국 달러 USD</option>
+                        <option value="KRW">대한민국 원 KRW</option>
+                        <option value="JPY">일본 엔 JPY</option>
+                        <option value="EUR">유로 EUR</option>
+                        <option value="CNY">중국 위안 CNY</option>
+                        <option value="GBP">영국 파운드 GBP</option>
+                        <option value="HKD">홍콩 달러 HKD</option>
+                        <option value="AUD">호주 달러 AUD</option>
+                      </select>
                     </label>
                     <label class="field">
                       <span>대상</span>
-                      <input name="target" value="KRW" maxlength="3" required />
+                      <select id="fx-target-select" name="target" required>
+                        <option value="USD">미국 달러 USD</option>
+                        <option value="KRW" selected>대한민국 원 KRW</option>
+                        <option value="JPY">일본 엔 JPY</option>
+                        <option value="EUR">유로 EUR</option>
+                        <option value="CNY">중국 위안 CNY</option>
+                        <option value="GBP">영국 파운드 GBP</option>
+                        <option value="HKD">홍콩 달러 HKD</option>
+                        <option value="AUD">호주 달러 AUD</option>
+                      </select>
                     </label>
-                    <button class="primary-button" type="submit">조회</button>
                   </form>
-                  <div class="quick-actions compact-actions">
-                    <button class="ghost-button small" type="button" data-action="add-current-fx-pair">현재 페어 저장</button>
-                    <button class="ghost-button small" type="button" data-action="open-current-fx-analysis">상세분석</button>
-                    <button class="ghost-button small" type="button" data-action="open-current-fx-alert">알림 추가</button>
-                  </div>
                   <div id="fx-result" class="empty-state">환율을 조회하면 여기에 표시됩니다.</div>
                   <div class="callout compact-callout">
                     저장한 관심환율은 여기서 바로 상세분석, 알림, 삭제를 관리합니다.
@@ -305,19 +317,10 @@
             <button class="ghost-button small" type="button" data-action="close-analysis-modal">닫기</button>
           </div>
         </div>
-        <div id="analysis-range-switch" class="analysis-range-switch" role="radiogroup" aria-label="분석 기간">
-          <label class="analysis-range-option">
-            <input type="radio" name="analysis-range" value="short" checked />
-            <span>단기</span>
-          </label>
-          <label class="analysis-range-option">
-            <input type="radio" name="analysis-range" value="medium" />
-            <span>중기</span>
-          </label>
-          <label class="analysis-range-option">
-            <input type="radio" name="analysis-range" value="long" />
-            <span>장기</span>
-          </label>
+        <div id="analysis-range-switch" class="analysis-range-switch" role="tablist" aria-label="분석 기간">
+          <button class="analysis-range-tab active" type="button" role="tab" data-period="short" aria-selected="true">단기</button>
+          <button class="analysis-range-tab" type="button" role="tab" data-period="medium" aria-selected="false">중기</button>
+          <button class="analysis-range-tab" type="button" role="tab" data-period="long" aria-selected="false">장기</button>
         </div>
         <div id="analysis-body" class="analysis-body"></div>
       </div>
