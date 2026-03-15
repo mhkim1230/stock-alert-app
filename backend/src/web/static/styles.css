@@ -755,6 +755,7 @@ button:disabled {
 .analysis-body {
   display: grid;
   gap: 10px;
+  padding-top: 4px;
 }
 
 .analysis-grid {
@@ -827,6 +828,34 @@ button:disabled {
   color: var(--muted);
   font-size: 0.78rem;
   line-height: 1.35;
+}
+
+.analysis-details summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.82rem;
+  list-style: none;
+}
+
+.analysis-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.analysis-details summary::after {
+  content: "열기";
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.analysis-details[open] summary::after {
+  content: "닫기";
+}
+
+.analysis-details .analysis-score-grid,
+.analysis-details .analysis-notes {
+  margin-top: 10px;
 }
 
 .toast-root {
@@ -1029,7 +1058,7 @@ button:disabled {
   .analysis-range-switch {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     top: calc(env(safe-area-inset-top) + 84px);
-    margin-top: 2px;
+    margin-top: 6px;
     gap: 3px;
     padding: 3px;
   }
@@ -1038,6 +1067,10 @@ button:disabled {
     padding: 7px 3px;
     font-size: 0.7rem;
     letter-spacing: -0.03em;
+  }
+
+  .analysis-body {
+    padding-top: 8px;
   }
 
   .modal-sticky-head .eyebrow {

@@ -184,6 +184,13 @@ class TechnicalAnalysisResponse(BaseModel):
     stop_loss: float
     confidence_score: int
     confidence_label: str
+    final_score: int
+    final_action: str
+    trend_score: int
+    momentum_score: int
+    volume_score: int
+    volatility_score: int
+    risk_penalty: int
     summary_title: str
     summary_body: str
     trend_outlook: str
@@ -191,6 +198,18 @@ class TechnicalAnalysisResponse(BaseModel):
     buy_plan: str
     sell_plan: str
     loss_cut_plan: str
+    decision_summary: str
+    trend_summary: str
+    timing_summary: str
+    volume_summary: str
+    volatility_summary: str
+    price_reference_summary: str
+    decision_reasons: List[str] = Field(default_factory=list)
+    trend_reasons: List[str] = Field(default_factory=list)
+    momentum_reasons: List[str] = Field(default_factory=list)
+    volume_reasons: List[str] = Field(default_factory=list)
+    volatility_reasons: List[str] = Field(default_factory=list)
+    risk_reasons: List[str] = Field(default_factory=list)
     investor_summary: Optional[str] = None
     news_brief: Optional[str] = None
     risk_notes: List[str] = Field(default_factory=list)

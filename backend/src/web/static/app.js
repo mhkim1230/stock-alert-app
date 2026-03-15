@@ -421,6 +421,7 @@ function renderAnalysis(data) {
       formatter,
     }),
   ];
+  const decisionTitle = data.final_action === "매수" ? "매수 근거" : data.final_action === "매도" ? "매도 근거" : "홀드 근거";
 
   setAnalysisHeader({
     title: `${data.name}`,
@@ -430,27 +431,53 @@ function renderAnalysis(data) {
 
   elements.analysisBody.innerHTML = `
     <section class="analysis-hero-card">
-      <p class="analysis-chip">${data.trend}</p>
-      <h4>${data.summary_title}</h4>
-      <p class="analysis-copy">${data.summary_body}</p>
+      <p class="analysis-chip">${data.final_action}</p>
+      <h4>${data.final_score}점 · ${data.final_action}</h4>
+      <p class="analysis-copy">${data.decision_summary}</p>
       <div class="analysis-meta-grid">
         <div class="stat-card">
-          <small>분석 신뢰도</small>
-          <strong>${data.confidence_score}점 · ${data.confidence_label}</strong>
+          <small>최종 판단</small>
+          <strong>${data.final_action}</strong>
         </div>
         <div class="stat-card">
-          <small>기본 대응</small>
-          <strong>${data.bias}</strong>
+          <small>최종 점수</small>
+          <strong>${data.final_score}점</strong>
         </div>
       </div>
     </section>
     <section class="analysis-section-card">
-      <h5>추세 예측</h5>
-      <p class="analysis-copy">${data.trend_outlook}</p>
+      <h5>${decisionTitle}</h5>
+      <ul class="analysis-notes">
+        ${(data.decision_reasons || []).map((reason) => `<li>${reason}</li>`).join("")}
+      </ul>
     </section>
     <section class="analysis-section-card">
-      <h5>대응 전략</h5>
-      <p class="analysis-copy">${data.action_plan}</p>
+      <h5>추세 분석</h5>
+      <p class="analysis-copy">${data.trend_summary}</p>
+      <ul class="analysis-notes">
+        ${(data.trend_reasons || []).map((reason) => `<li>${reason}</li>`).join("")}
+      </ul>
+    </section>
+    <section class="analysis-section-card">
+      <h5>과열·타이밍 판단</h5>
+      <p class="analysis-copy">${data.timing_summary}</p>
+      <ul class="analysis-notes">
+        ${(data.momentum_reasons || []).map((reason) => `<li>${reason}</li>`).join("")}
+      </ul>
+    </section>
+    <section class="analysis-section-card">
+      <h5>거래량·신뢰도</h5>
+      <p class="analysis-copy">${data.volume_summary}</p>
+      <ul class="analysis-notes">
+        ${(data.volume_reasons || []).map((reason) => `<li>${reason}</li>`).join("")}
+      </ul>
+    </section>
+    <section class="analysis-section-card">
+      <h5>변동성 점검</h5>
+      <p class="analysis-copy">${data.volatility_summary}</p>
+      <ul class="analysis-notes">
+        ${(data.volatility_reasons || []).map((reason) => `<li>${reason}</li>`).join("")}
+      </ul>
     </section>
     <section class="analysis-section-card">
       <h5>매수 · 매도 · 손절 구간</h5>
@@ -461,11 +488,7 @@ function renderAnalysis(data) {
           <strong>${formatter(data.stop_loss, data.price_unit)}</strong>
         </div>
       </div>
-      <div class="analysis-copy-group">
-        <p class="analysis-copy"><strong>매수 전략</strong> ${data.buy_plan}</p>
-        <p class="analysis-copy"><strong>매도 전략</strong> ${data.sell_plan}</p>
-        <p class="analysis-copy"><strong>손절 전략</strong> ${data.loss_cut_plan}</p>
-      </div>
+      <p class="analysis-copy">${data.price_reference_summary}</p>
     </section>
     ${data.investor_summary ? `
       <section class="analysis-section-card">
@@ -482,15 +505,37 @@ function renderAnalysis(data) {
     <section class="analysis-section-card">
       <h5>위험 요인</h5>
       <ul class="analysis-notes">
-        ${(data.risk_notes || []).length ? data.risk_notes.map((note) => `<li>${note}</li>`).join("") : "<li>현재 확인된 특이 위험 요인은 제한적입니다.</li>"}
+        ${(data.risk_reasons || []).length ? data.risk_reasons.map((note) => `<li>${note}</li>`).join("") : "<li>현재 확인된 특이 위험 요인은 제한적입니다.</li>"}
       </ul>
     </section>
-    <section class="analysis-section-card">
-      <h5>판단 근거</h5>
+    <details class="analysis-section-card analysis-details">
+      <summary>세부 점수 보기</summary>
+      <div class="analysis-grid analysis-score-grid">
+        <div class="stat-card">
+          <small>추세 점수</small>
+          <strong>${data.trend_score}점</strong>
+        </div>
+        <div class="stat-card">
+          <small>모멘텀 점수</small>
+          <strong>${data.momentum_score}점</strong>
+        </div>
+        <div class="stat-card">
+          <small>거래량 점수</small>
+          <strong>${data.volume_score}점</strong>
+        </div>
+        <div class="stat-card">
+          <small>변동성 점수</small>
+          <strong>${data.volatility_score}점</strong>
+        </div>
+        <div class="stat-card">
+          <small>위험 차감</small>
+          <strong>${data.risk_penalty}점</strong>
+        </div>
+      </div>
       <ul class="analysis-notes">
-      ${data.notes.map((note) => `<li>${note}</li>`).join("")}
+        ${(data.notes || []).map((note) => `<li>${note}</li>`).join("")}
       </ul>
-    </section>
+    </details>
   `;
 }
 

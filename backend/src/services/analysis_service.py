@@ -1,5 +1,5 @@
 import logging
-from statistics import mean
+from statistics import mean, pstdev
 from typing import Dict, List, Optional, Tuple
 
 import aiohttp
@@ -392,17 +392,23 @@ class AnalysisService:
         profile = self._get_strategy_profile(period)
 
         current = closes[-1]
+        previous_close = closes[-2] if len(closes) > 1 else closes[-1]
         primary_span = min(profile["primary_span"], len(closes))
         secondary_span = min(profile["secondary_span"], len(closes))
         sma20 = mean(closes[-primary_span:]) if len(closes) >= primary_span else mean(closes)
         sma60 = mean(closes[-secondary_span:]) if len(closes) >= secondary_span else mean(closes)
+        prev_sma20 = mean(closes[-primary_span - 1:-1]) if len(closes) > primary_span else sma20
+        prev_sma60 = mean(closes[-secondary_span - 1:-1]) if len(closes) > secondary_span else sma60
         low20 = min(lows[-primary_span:]) if len(lows) >= primary_span else min(lows)
         low60 = min(lows[-secondary_span:]) if len(lows) >= secondary_span else min(lows)
         high20 = max(highs[-primary_span:]) if len(highs) >= primary_span else max(highs)
         high60 = max(highs[-secondary_span:]) if len(highs) >= secondary_span else max(highs)
         rsi14 = self._calculate_rsi(closes, 14)
         macd_line, macd_signal, macd_hist = self._calculate_macd(closes)
+        macd_metrics = self._calculate_macd_metrics(closes)
+        stochastic = self._calculate_stochastic(history)
         atr14 = self._calculate_atr(history, 14)
+        bollinger = self._calculate_bollinger(closes, min(20, len(closes)))
         volume_ratio = self._calculate_volume_ratio(volumes, 20)
         volume_signal = self._label_volume_signal(volume_ratio)
 
@@ -450,55 +456,73 @@ class AnalysisService:
         second_sell = resistances[1] if len(resistances) > 1 else current * (1 + profile["sell_gap_2"])
         stop_loss = max(second_buy * profile["stop_factor"], low60 * profile["low_factor"])
 
-        confidence_score = self._calculate_confidence(
+        trend_score, trend_reasons = self._score_trend(
+            current=current,
+            previous_close=previous_close,
+            sma20=sma20,
+            sma60=sma60,
+            prev_sma20=prev_sma20,
+            macd_metrics=macd_metrics,
+        )
+        momentum_score, momentum_reasons, timing_summary = self._score_momentum(
+            rsi14=rsi14,
+            stochastic=stochastic,
+        )
+        volume_score, volume_reasons, volume_summary = self._score_volume(
+            volume_ratio=volume_ratio,
+            previous_close=previous_close,
+            current=current,
+        )
+        volatility_score, volatility_reasons, volatility_summary = self._score_volatility(
+            current=current,
+            atr14=atr14,
+            bollinger=bollinger,
+        )
+        risk_penalty, risk_reasons = self._score_risk(
             current=current,
             sma20=sma20,
             sma60=sma60,
-            low20=low20,
-            high20=high20,
-            supports=supports,
-            resistances=resistances,
             rsi14=rsi14,
-            macd_hist=macd_hist,
-            volume_ratio=volume_ratio,
+            stochastic=stochastic,
             investor_flow=investor_flow,
             news_context=news_context,
+            resistances=resistances,
+            bollinger=bollinger,
+            macd_metrics=macd_metrics,
         )
+
+        final_score = max(0, min(100, trend_score + momentum_score + volume_score + volatility_score - risk_penalty))
+        if final_score >= 60:
+            final_action = "매수"
+        elif final_score <= 30:
+            final_action = "매도"
+        else:
+            final_action = "홀드"
+
+        confidence_score = max(35, min(95, 35 + volume_score * 4 - max(0, risk_penalty - 6)))
         confidence_label = self._label_confidence(confidence_score)
         investor_summary = self._summarize_investor_flow(investor_flow)
         news_brief = news_context.get("summary")
-        summary_title = self._build_summary_title(trend, bias, confidence_label)
-        summary_body = self._build_summary_body(
-            trend=trend,
-            bias=bias,
-            timeframe=timeframe,
-            volume_signal=volume_signal,
-            investor_summary=investor_summary,
-            news_brief=news_brief,
+        price_reference_summary = (
+            f"1차 지지선은 {self._fmt(first_buy, price_unit, asset_type)}, 2차 지지선은 {self._fmt(second_buy, price_unit, asset_type)}입니다. "
+            f"1차 저항선은 {self._fmt(first_sell, price_unit, asset_type)}, 2차 저항선은 {self._fmt(second_sell, price_unit, asset_type)}입니다."
         )
-        trend_outlook = self._build_trend_outlook(
-            trend=trend,
-            current=current,
-            sma20=sma20,
-            sma60=sma60,
-            price_unit=price_unit,
-            asset_type=asset_type,
-            volume_signal=volume_signal,
-            investor_summary=investor_summary,
+        decision_reasons = self._build_decision_reasons(
+            final_action=final_action,
+            trend_reasons=trend_reasons,
+            momentum_reasons=momentum_reasons,
+            volume_reasons=volume_reasons,
+            risk_reasons=risk_reasons,
         )
-        action_plan = self._build_action_plan(
-            trend=trend,
-            bias=bias,
-            first_buy=first_buy,
-            second_buy=second_buy,
-            first_sell=first_sell,
-            second_sell=second_sell,
-            price_unit=price_unit,
-            asset_type=asset_type,
+        decision_summary = (
+            f"최종 점수 {final_score}점으로 {final_action} 판단입니다. "
+            f"추세 {trend_score}점, 모멘텀 {momentum_score}점, 거래량 {volume_score}점, 변동성 {volatility_score}점에 "
+            f"위험 차감 {risk_penalty}점을 반영했습니다."
         )
-        buy_plan = self._build_buy_plan(first_buy, second_buy, price_unit, asset_type, trend)
-        sell_plan = self._build_sell_plan(first_sell, second_sell, price_unit, asset_type, trend)
-        loss_cut_plan = self._build_loss_cut_plan(stop_loss, price_unit, asset_type)
+        trend_summary = self._join_reason_summary(
+            trend_reasons,
+            fallback=f"{profile['primary_label']}선과 {profile['secondary_label']}선 위치를 기준으로 추세를 확인했습니다.",
+        )
         risk_notes = self._build_risk_notes(
             trend=trend,
             rsi14=rsi14,
@@ -524,6 +548,23 @@ class AnalysisService:
             profile=profile,
         )
 
+        summary_title = f"최종 {final_score}점 · {final_action}"
+        summary_body = decision_summary
+        trend_outlook = trend_summary
+        action_plan = self._join_reason_summary(
+            decision_reasons,
+            fallback="현재 구간에서는 가격 기준점을 지키는지 확인하면서 대응 강도를 조절하는 편이 좋습니다.",
+        )
+        buy_plan = self._join_reason_summary(
+            trend_reasons[:2] + momentum_reasons[:1],
+            fallback=f"1차 매수는 {self._fmt(first_buy, price_unit, asset_type)}, 2차 매수는 {self._fmt(second_buy, price_unit, asset_type)}입니다.",
+        )
+        sell_plan = self._join_reason_summary(
+            volume_reasons[:1] + risk_reasons[:2],
+            fallback=f"1차 매도는 {self._fmt(first_sell, price_unit, asset_type)}, 2차 매도는 {self._fmt(second_sell, price_unit, asset_type)}입니다.",
+        )
+        loss_cut_plan = f"손절 기준은 {self._fmt(stop_loss, price_unit, asset_type)} 이탈 여부입니다."
+
         return {
             "asset_type": asset_type,
             "symbol": symbol,
@@ -539,6 +580,13 @@ class AnalysisService:
             "stop_loss": round(stop_loss, 4),
             "confidence_score": confidence_score,
             "confidence_label": confidence_label,
+            "final_score": final_score,
+            "final_action": final_action,
+            "trend_score": trend_score,
+            "momentum_score": momentum_score,
+            "volume_score": volume_score,
+            "volatility_score": volatility_score,
+            "risk_penalty": risk_penalty,
             "summary_title": summary_title,
             "summary_body": summary_body,
             "trend_outlook": trend_outlook,
@@ -546,6 +594,18 @@ class AnalysisService:
             "buy_plan": buy_plan,
             "sell_plan": sell_plan,
             "loss_cut_plan": loss_cut_plan,
+            "decision_summary": decision_summary,
+            "trend_summary": trend_summary,
+            "timing_summary": timing_summary,
+            "volume_summary": volume_summary,
+            "volatility_summary": volatility_summary,
+            "price_reference_summary": price_reference_summary,
+            "decision_reasons": decision_reasons,
+            "trend_reasons": trend_reasons,
+            "momentum_reasons": momentum_reasons,
+            "volume_reasons": volume_reasons,
+            "volatility_reasons": volatility_reasons,
+            "risk_reasons": risk_reasons,
             "investor_summary": investor_summary,
             "news_brief": news_brief,
             "risk_notes": risk_notes,
@@ -865,6 +925,260 @@ class AnalysisService:
         return reasons[:5]
 
     @staticmethod
+    def _join_reason_summary(reasons: List[str], fallback: str) -> str:
+        cleaned = [reason.strip() for reason in reasons if reason and reason.strip()]
+        if not cleaned:
+            return fallback
+        return " ".join(cleaned[:3])
+
+    def _score_trend(
+        self,
+        current: float,
+        previous_close: float,
+        sma20: float,
+        sma60: float,
+        prev_sma20: float,
+        macd_metrics: Dict[str, Optional[float]],
+    ) -> Tuple[int, List[str]]:
+        score = 0
+        reasons: List[str] = []
+
+        if current >= sma20 >= sma60:
+            score += 18
+            reasons.append("단기선과 중기선이 정배열이라 추세가 상승 쪽으로 기울어 있습니다.")
+        elif current >= sma20 and sma20 < sma60:
+            score += 12
+            reasons.append("현재가가 단기선 위로 올라와 반등 시도가 이어지고 있습니다.")
+        elif current <= sma20 <= sma60:
+            score += 3
+            reasons.append("현재가가 단기선과 중기선 아래에 있어 추세는 아직 약세입니다.")
+        else:
+            score += 8
+            reasons.append("이동평균선이 엇갈려 있어 추세는 아직 확인 구간입니다.")
+
+        if previous_close <= prev_sma20 < current or (previous_close <= prev_sma20 and current > sma20):
+            score += 5
+            reasons.append("단기 이동평균선을 상향 돌파해 매수세가 다시 들어오고 있습니다.")
+        elif previous_close >= prev_sma20 > current or (previous_close >= prev_sma20 and current < sma20):
+            reasons.append("단기 이동평균선 아래로 밀려 추세 탄력이 약해졌습니다.")
+
+        if macd_metrics.get("golden_cross"):
+            score += 7
+            reasons.append("MACD 골든크로스가 발생해 추세 전환 신호가 확인됩니다.")
+        elif macd_metrics.get("macd_line") is not None and macd_metrics.get("signal_line") is not None:
+            if macd_metrics["macd_line"] > macd_metrics["signal_line"] and (macd_metrics.get("histogram") or 0) >= 0:
+                score += 5
+                reasons.append("MACD가 시그널선 위에서 유지돼 추세 신호가 우호적입니다.")
+            elif macd_metrics.get("dead_cross"):
+                reasons.append("MACD 데드크로스가 발생해 추세 반전 신호가 약해졌습니다.")
+            elif macd_metrics["macd_line"] < macd_metrics["signal_line"]:
+                reasons.append("MACD가 시그널선 아래에 있어 약세 모멘텀이 남아 있습니다.")
+
+        return min(30, score), reasons[:4]
+
+    @staticmethod
+    def _score_momentum(
+        rsi14: Optional[float],
+        stochastic: Dict[str, Optional[float]],
+    ) -> Tuple[int, List[str], str]:
+        score = 0
+        reasons: List[str] = []
+
+        if rsi14 is not None:
+            if 45 <= rsi14 <= 65:
+                score += 8
+                reasons.append("RSI가 중립 상단에 있어 추세를 이어갈 체력이 남아 있습니다.")
+            elif 30 <= rsi14 < 45:
+                score += 6
+                reasons.append("RSI가 과매도 구간에서 벗어나며 반등 여지가 생기고 있습니다.")
+            elif 65 < rsi14 <= 75:
+                score += 4
+                reasons.append("RSI가 강세권에 있지만 과열 직전이라 추격 매수는 조심해야 합니다.")
+            elif rsi14 < 30:
+                score += 4
+                reasons.append("RSI가 과매도권이라 기술적 반등 가능성은 있으나 변동성이 큽니다.")
+            else:
+                score += 2
+                reasons.append("RSI가 과열권에 가까워 단기 진입 타이밍은 보수적으로 보는 편이 좋습니다.")
+
+        k_value = stochastic.get("k")
+        d_value = stochastic.get("d")
+        if stochastic.get("golden_cross") and k_value is not None and k_value <= 45:
+            score += 8
+            reasons.append("스토캐스틱 골든크로스가 저점권에서 나와 단기 반등 타이밍 신호가 살아 있습니다.")
+        elif k_value is not None and d_value is not None and k_value > d_value and k_value < 80:
+            score += 6
+            reasons.append("스토캐스틱이 시그널 위에서 움직여 단기 모멘텀이 우호적입니다.")
+        elif stochastic.get("dead_cross") and k_value is not None and k_value >= 55:
+            score += 1
+            reasons.append("스토캐스틱 데드크로스가 나와 단기 탄력이 둔화되고 있습니다.")
+        elif k_value is not None and k_value >= 85:
+            score += 1
+            reasons.append("스토캐스틱이 과열권이라 지금은 타이밍을 좇기보다 눌림을 기다리는 편이 좋습니다.")
+
+        if rsi14 is not None and rsi14 >= 75:
+            timing_summary = "RSI와 스토캐스틱 모두 과열권에 가까워 추격 매수보다 눌림 확인이 유리합니다."
+        elif rsi14 is not None and rsi14 <= 35:
+            timing_summary = "RSI가 눌린 구간에 있고 스토캐스틱 반등 여부를 함께 보면 단기 진입 타이밍을 판단하기 좋습니다."
+        else:
+            timing_summary = "RSI와 스토캐스틱 기준으로 타이밍은 중립 이상이며, 과열 여부만 조심하면 됩니다."
+
+        return min(20, score), reasons[:4], timing_summary
+
+    @staticmethod
+    def _score_volume(
+        volume_ratio: Optional[float],
+        previous_close: float,
+        current: float,
+    ) -> Tuple[int, List[str], str]:
+        score = 0
+        reasons: List[str] = []
+        price_up = current >= previous_close
+
+        if volume_ratio is None:
+            return 5, ["거래량 데이터가 제한적이라 신뢰도는 보수적으로 반영했습니다."], "거래량 기준 신뢰도는 제한적으로 해석했습니다."
+
+        if volume_ratio >= 1.8 and price_up:
+            score += 15
+            reasons.append("거래량이 크게 늘어난 상태에서 양봉이 나와 상승 신호 신뢰도가 강해졌습니다.")
+        elif volume_ratio >= 1.2 and price_up:
+            score += 12
+            reasons.append("거래량이 평균보다 늘어난 상태라 상승 시도의 신뢰도가 높아졌습니다.")
+        elif 0.9 <= volume_ratio < 1.2:
+            score += 9
+            reasons.append("거래량이 평균 수준이라 추세 판단의 기본 신뢰도는 유지됩니다.")
+        elif volume_ratio >= 1.2 and not price_up:
+            score += 5
+            reasons.append("거래량은 늘었지만 하락 쪽 거래가 붙어 매수 신호 신뢰도는 낮아졌습니다.")
+        else:
+            score += 3
+            reasons.append("거래량이 줄어 신호의 지속성은 약하게 보는 편이 좋습니다.")
+
+        summary = (
+            f"거래량 비율은 {volume_ratio:.2f}배이며, "
+            f"{'상승 신호 신뢰도를 높여 주는 구간입니다.' if score >= 10 else '신호를 강하게 밀어주기에는 다소 약한 구간입니다.'}"
+        )
+        return min(15, score), reasons[:3], summary
+
+    def _score_volatility(
+        self,
+        current: float,
+        atr14: Optional[float],
+        bollinger: Dict[str, Optional[float]],
+    ) -> Tuple[int, List[str], str]:
+        score = 0
+        reasons: List[str] = []
+
+        bandwidth = bollinger.get("bandwidth")
+        position = bollinger.get("position")
+        middle = bollinger.get("middle")
+        if bandwidth is not None and position is not None:
+            if 0.15 <= position <= 0.75 and bandwidth <= 0.18:
+                score += 8
+                reasons.append("볼린저밴드 안쪽에서 움직이며 밴드 폭이 과하지 않아 변동성 부담이 크지 않습니다.")
+            elif position >= 0.85:
+                score += 4
+                reasons.append("볼린저밴드 상단 근처라 추세는 강하지만 단기 흔들림 가능성도 커졌습니다.")
+            elif position <= 0.15:
+                score += 4
+                reasons.append("볼린저밴드 하단 부근이라 반등 여지는 있지만 변동성이 아직 큰 구간입니다.")
+            else:
+                score += 6
+                reasons.append("볼린저밴드 기준으로는 중립적인 변동성 구간입니다.")
+        else:
+            score += 5
+            reasons.append("볼린저밴드 데이터가 충분하지 않아 변동성 점수는 보수적으로 반영했습니다.")
+
+        atr_ratio = (atr14 / current) if atr14 and current else None
+        if atr_ratio is not None:
+            if atr_ratio <= 0.025:
+                score += 7
+                reasons.append("ATR이 낮아 손절 기준을 잡기 상대적으로 쉬운 구간입니다.")
+            elif atr_ratio <= 0.05:
+                score += 5
+                reasons.append("ATR은 무난한 수준이라 감당 가능한 변동성으로 볼 수 있습니다.")
+            elif atr_ratio <= 0.08:
+                score += 3
+                reasons.append("ATR이 다소 높아 진입 후 흔들림을 감안해야 합니다.")
+            else:
+                score += 1
+                reasons.append("ATR이 높아 단기 변동폭이 크므로 진입 강도를 줄이는 편이 좋습니다.")
+
+        summary = self._join_reason_summary(reasons, "변동성은 중립 수준으로 봤습니다.")
+        return min(15, score), reasons[:4], summary
+
+    def _score_risk(
+        self,
+        current: float,
+        sma20: float,
+        sma60: float,
+        rsi14: Optional[float],
+        stochastic: Dict[str, Optional[float]],
+        investor_flow: Optional[Dict],
+        news_context: Dict,
+        resistances: List[float],
+        bollinger: Dict[str, Optional[float]],
+        macd_metrics: Dict[str, Optional[float]],
+    ) -> Tuple[int, List[str]]:
+        penalty = 0
+        reasons: List[str] = []
+
+        if current < sma20 < sma60:
+            penalty += 5
+            reasons.append("현재가가 단기선과 중기선 아래에 있어 추세 역행 진입 위험이 있습니다.")
+
+        if resistances:
+            gap = abs(resistances[0] - current) / current if current else 0
+            if gap <= 0.015:
+                penalty += 4
+                reasons.append("가까운 저항선이 바로 위에 있어 상승 여력이 제한될 수 있습니다.")
+
+        if rsi14 is not None and rsi14 >= 75:
+            penalty += 4
+            reasons.append("RSI가 과열권이라 단기 차익 매물이 나올 가능성이 큽니다.")
+
+        k_value = stochastic.get("k")
+        if stochastic.get("dead_cross") and k_value is not None and k_value >= 75:
+            penalty += 3
+            reasons.append("스토캐스틱 데드크로스가 과열권에서 나와 단기 타이밍이 불리합니다.")
+
+        if investor_flow:
+            if investor_flow.get("market_scope") == "domestic" and investor_flow.get("foreign_direction") == investor_flow.get("institution_direction") == "순매도":
+                penalty += 4
+                reasons.append("외국인과 기관이 함께 매도 우위라 수급이 받쳐주지 않고 있습니다.")
+            elif investor_flow.get("market_scope") == "global" and investor_flow.get("flow_label") == "유출 우위":
+                penalty += 3
+                reasons.append("해외 수급 추정상 유출 우위라 단기 추세가 쉽게 꺾일 수 있습니다.")
+
+        if news_context.get("news_bias") == "부담":
+            penalty += 4
+            reasons.append(news_context.get("summary") or "뉴스·국제정세 부담이 단기 변동성을 키우고 있습니다.")
+
+        if bollinger.get("position") is not None and bollinger["position"] >= 0.95:
+            penalty += 2
+            reasons.append("볼린저밴드 상단 과열 구간에 가까워 단기 되돌림이 나올 수 있습니다.")
+
+        if macd_metrics.get("dead_cross"):
+            penalty += 3
+            reasons.append("MACD 데드크로스가 확인돼 추세 탄력이 약해지고 있습니다.")
+
+        return min(20, penalty), reasons[:5]
+
+    def _build_decision_reasons(
+        self,
+        final_action: str,
+        trend_reasons: List[str],
+        momentum_reasons: List[str],
+        volume_reasons: List[str],
+        risk_reasons: List[str],
+    ) -> List[str]:
+        if final_action == "매수":
+            return (trend_reasons[:2] + momentum_reasons[:1] + volume_reasons[:1])[:4]
+        if final_action == "매도":
+            return (risk_reasons[:3] + trend_reasons[:1])[:4]
+        return (trend_reasons[:1] + momentum_reasons[:1] + risk_reasons[:2])[:4]
+
+    @staticmethod
     def _calculate_rsi(closes: List[float], period: int) -> Optional[float]:
         if len(closes) <= period:
             return None
@@ -900,6 +1214,89 @@ class AnalysisService:
         signal_line = signal_series[-1]
         histogram = macd_line - signal_line
         return macd_line, signal_line, histogram
+
+    def _calculate_macd_metrics(self, closes: List[float]) -> Dict[str, Optional[float]]:
+        if len(closes) < 35:
+            return {
+                "macd_line": None,
+                "signal_line": None,
+                "histogram": None,
+                "golden_cross": False,
+                "dead_cross": False,
+            }
+        ema12 = self._ema(closes, 12)
+        ema26 = self._ema(closes, 26)
+        macd_series = [a - b for a, b in zip(ema12[-len(ema26):], ema26)]
+        signal_series = self._ema(macd_series, 9)
+        macd_line = macd_series[-1]
+        signal_line = signal_series[-1]
+        histogram = macd_line - signal_line
+        prev_macd = macd_series[-2] if len(macd_series) > 1 else None
+        prev_signal = signal_series[-2] if len(signal_series) > 1 else None
+        golden_cross = prev_macd is not None and prev_signal is not None and prev_macd <= prev_signal and macd_line > signal_line
+        dead_cross = prev_macd is not None and prev_signal is not None and prev_macd >= prev_signal and macd_line < signal_line
+        return {
+            "macd_line": macd_line,
+            "signal_line": signal_line,
+            "histogram": histogram,
+            "golden_cross": golden_cross,
+            "dead_cross": dead_cross,
+        }
+
+    @staticmethod
+    def _calculate_stochastic(history: List[Dict[str, float]], period: int = 14, smooth: int = 3) -> Dict[str, Optional[float]]:
+        if len(history) < period + smooth:
+            return {"k": None, "d": None, "golden_cross": False, "dead_cross": False}
+
+        fast_k_values: List[float] = []
+        for idx in range(period - 1, len(history)):
+            window = history[idx - period + 1: idx + 1]
+            highest = max(candle["high"] for candle in window)
+            lowest = min(candle["low"] for candle in window)
+            close = history[idx]["close"]
+            if highest == lowest:
+                fast_k_values.append(50.0)
+            else:
+                fast_k_values.append(((close - lowest) / (highest - lowest)) * 100)
+
+        if len(fast_k_values) < smooth + 1:
+            return {"k": None, "d": None, "golden_cross": False, "dead_cross": False}
+
+        slow_k_series = [mean(fast_k_values[max(0, idx - smooth + 1): idx + 1]) for idx in range(len(fast_k_values))]
+        slow_d_series = [mean(slow_k_series[max(0, idx - smooth + 1): idx + 1]) for idx in range(len(slow_k_series))]
+        k_value = slow_k_series[-1]
+        d_value = slow_d_series[-1]
+        prev_k = slow_k_series[-2]
+        prev_d = slow_d_series[-2]
+        return {
+            "k": k_value,
+            "d": d_value,
+            "golden_cross": prev_k <= prev_d and k_value > d_value,
+            "dead_cross": prev_k >= prev_d and k_value < d_value,
+        }
+
+    @staticmethod
+    def _calculate_bollinger(closes: List[float], period: int = 20, multiplier: float = 2.0) -> Dict[str, Optional[float]]:
+        if len(closes) < period:
+            return {"middle": None, "upper": None, "lower": None, "bandwidth": None, "position": None}
+        window = closes[-period:]
+        middle = mean(window)
+        deviation = pstdev(window) if len(window) > 1 else 0.0
+        upper = middle + multiplier * deviation
+        lower = middle - multiplier * deviation
+        bandwidth = ((upper - lower) / middle) if middle else None
+        latest = closes[-1]
+        if upper == lower:
+            position = 0.5
+        else:
+            position = (latest - lower) / (upper - lower)
+        return {
+            "middle": middle,
+            "upper": upper,
+            "lower": lower,
+            "bandwidth": bandwidth,
+            "position": position,
+        }
 
     @staticmethod
     def _calculate_atr(history: List[Dict[str, float]], period: int) -> Optional[float]:
