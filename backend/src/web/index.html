@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#112b1f" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Stock Alert" />
-    <title>Stock Alert</title>
+    <meta name="apple-mobile-web-app-title" content="주식 알림" />
+    <title>주식 알림</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
@@ -21,8 +21,8 @@
     <div class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Personal Market Desk</p>
-          <h1>Stock Alert PWA</h1>
+          <p class="eyebrow">개인 시장 보드</p>
+          <h1>주식 알림</h1>
         </div>
         <div class="topbar-actions">
           <button id="install-button" class="ghost-button hidden" type="button">홈 화면 추가</button>
@@ -33,7 +33,7 @@
       <main id="app" class="app-grid">
         <section id="login-panel" class="login-panel">
           <div class="login-card">
-            <p class="eyebrow">Single-user Access</p>
+            <p class="eyebrow">1인 전용</p>
             <h2>비밀번호로 접속</h2>
             <p class="muted">
               회원가입 없이 단일 관리자 비밀번호로 접속합니다. 로그인 후 같은 브라우저에서는 세션이 유지됩니다.
@@ -52,7 +52,7 @@
         <section id="app-panel" class="hidden">
           <div class="status-strip">
             <div>
-              <p class="eyebrow">Cloud-only setup</p>
+              <p class="eyebrow">클라우드 전용</p>
               <p class="muted compact">
                 Render와 Supabase에서 동작합니다. 맥을 꺼도 관심종목과 알림 기록이 그대로 유지됩니다.
               </p>
@@ -72,7 +72,7 @@
                 <article class="panel-card">
                   <div class="panel-head">
                     <div>
-                      <p class="eyebrow">Quick Summary</p>
+                      <p class="eyebrow">요약</p>
                       <h3>현재 상태</h3>
                     </div>
                     <button id="refresh-dashboard" class="ghost-button small" type="button">새로고침</button>
@@ -80,17 +80,15 @@
                   <div id="summary-grid" class="summary-grid"></div>
                   <div class="quick-actions">
                     <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
-                    <button class="ghost-button" type="button" data-action="go-to-fx-watchlist">관심환율 보기</button>
                   </div>
                 </article>
 
                 <article class="panel-card">
                   <div class="panel-head">
                     <div>
-                      <p class="eyebrow">FX</p>
+                      <p class="eyebrow">환율</p>
                       <h3>환율 조회</h3>
                     </div>
-                    <button class="ghost-button small" type="button" data-action="go-to-fx-watchlist">관심환율</button>
                   </div>
                   <form id="fx-form" class="inline-form compact-form">
                     <label class="field">
@@ -105,14 +103,20 @@
                   </form>
                   <div class="quick-actions compact-actions">
                     <button class="ghost-button small" type="button" data-action="add-current-fx-pair">현재 페어 저장</button>
+                    <button class="ghost-button small" type="button" data-action="open-current-fx-analysis">상세분석</button>
+                    <button class="ghost-button small" type="button" data-action="open-current-fx-alert">알림 추가</button>
                   </div>
                   <div id="fx-result" class="empty-state">환율을 조회하면 여기에 표시됩니다.</div>
+                  <div class="callout compact-callout">
+                    저장한 관심환율은 여기서 바로 상세분석, 알림, 삭제를 관리합니다.
+                  </div>
+                  <ul id="fx-watchlist-list" class="resource-list scroll-area tall"></ul>
                 </article>
 
                 <article class="panel-card">
                   <div class="panel-head">
                     <div>
-                      <p class="eyebrow">Recent Activity</p>
+                      <p class="eyebrow">최근 활동</p>
                       <h3>최근 알림</h3>
                     </div>
                   </div>
@@ -122,7 +126,7 @@
                 <article class="panel-card">
                   <div class="panel-head">
                     <div>
-                      <p class="eyebrow">Latest News</p>
+                      <p class="eyebrow">뉴스</p>
                       <h3>뉴스 보기</h3>
                     </div>
                   </div>
@@ -142,42 +146,15 @@
               <div class="panel-card">
                 <div class="panel-head">
                   <div>
-                    <p class="eyebrow">Watchlist</p>
-                    <h3>관심종목과 관심환율</h3>
+                    <p class="eyebrow">관심종목</p>
+                    <h3>관심주식</h3>
                   </div>
                   <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
                 </div>
-                <div class="asset-tabs" aria-label="관심항목 종류">
-                  <button class="asset-tab-button active" data-asset-view="stocks" type="button">주식</button>
-                  <button class="asset-tab-button" data-asset-view="fx" type="button">환율</button>
+                <div class="callout compact-callout">
+                  한글 종목명, 영문명, 티커, 숫자 코드로 검색해서 추가하고, 각 항목의 <strong>상세분석</strong> 또는 <strong>알림</strong> 버튼으로 관리하실 수 있습니다.
                 </div>
-
-                <div class="asset-view active" data-asset-panel="stocks">
-                  <div class="callout compact-callout">
-                    한글 종목명, 영문명, 티커, 숫자 코드로 검색해서 추가하고, 각 항목의 <strong>상세분석</strong> 또는 <strong>알림</strong> 버튼으로 관리하실 수 있습니다.
-                  </div>
-                  <ul id="watchlist-list" class="resource-list scroll-area tall"></ul>
-                </div>
-
-                <div class="asset-view" data-asset-panel="fx">
-                  <div class="callout compact-callout">
-                    환율 페어를 저장해 두고 현재 환율, 상세분석, 알림을 바로 보실 수 있습니다.
-                  </div>
-                  <form id="fx-watchlist-form" class="stack compact">
-                    <div class="triple-grid">
-                      <label class="field">
-                        <span>기준</span>
-                        <input name="base" placeholder="USD" maxlength="3" required />
-                      </label>
-                      <label class="field">
-                        <span>대상</span>
-                        <input name="target" placeholder="KRW" maxlength="3" required />
-                      </label>
-                      <button class="primary-button" type="submit">환율 저장</button>
-                    </div>
-                  </form>
-                  <ul id="fx-watchlist-list" class="resource-list scroll-area tall"></ul>
-                </div>
+                <ul id="watchlist-list" class="resource-list scroll-area tall"></ul>
               </div>
             </section>
 
@@ -186,7 +163,7 @@
                 <article class="panel-card">
                   <div class="panel-head">
                     <div>
-                      <p class="eyebrow">PWA</p>
+                      <p class="eyebrow">설치</p>
                       <h3>설치와 사용</h3>
                     </div>
                   </div>
@@ -201,7 +178,7 @@
                 <article class="panel-card">
                   <div class="panel-head">
                     <div>
-                      <p class="eyebrow">Session</p>
+                      <p class="eyebrow">세션</p>
                       <h3>접속 상태</h3>
                     </div>
                   </div>
@@ -214,7 +191,7 @@
                 <article class="panel-card">
                   <div class="panel-head">
                     <div>
-                      <p class="eyebrow">Notifications</p>
+                      <p class="eyebrow">알림</p>
                       <h3>최근 알림 기록</h3>
                     </div>
                   </div>
@@ -232,7 +209,7 @@
       <div class="modal-card">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Stock Search</p>
+            <p class="eyebrow">종목 찾기</p>
             <h3 id="stock-search-title">종목 검색</h3>
           </div>
           <button class="ghost-button small" type="button" data-action="close-stock-search">닫기</button>
@@ -254,7 +231,7 @@
       <div class="modal-card">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Watchlist Alert</p>
+            <p class="eyebrow">주식 알림</p>
             <h3 id="stock-alert-modal-title">관심종목 알림 추가</h3>
           </div>
           <button class="ghost-button small" type="button" data-action="close-alert-modal">닫기</button>
@@ -267,7 +244,7 @@
           <article class="panel-card nested-card">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">Price Alert</p>
+                <p class="eyebrow">가격 알림</p>
                 <h3>주식 가격 알림</h3>
               </div>
             </div>
@@ -295,7 +272,7 @@
           <article class="panel-card nested-card">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">News Alert</p>
+                <p class="eyebrow">뉴스 알림</p>
                 <h3>뉴스 키워드 알림</h3>
               </div>
             </div>
@@ -317,7 +294,7 @@
       <div class="modal-card">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">FX Alert</p>
+            <p class="eyebrow">환율 알림</p>
             <h3 id="fx-alert-modal-title">환율 알림 추가</h3>
           </div>
           <button class="ghost-button small" type="button" data-action="close-fx-alert-modal">닫기</button>
@@ -350,13 +327,27 @@
 
     <div id="analysis-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="analysis-title">
       <div class="modal-backdrop" data-action="close-analysis-modal"></div>
-      <div class="modal-card">
-        <div class="panel-head">
+      <div class="modal-card analysis-modal-card">
+        <div class="panel-head modal-sticky-head">
           <div>
-            <p class="eyebrow">Technical View</p>
+            <p class="eyebrow">상세분석</p>
             <h3 id="analysis-title">상세분석</h3>
           </div>
           <button class="ghost-button small" type="button" data-action="close-analysis-modal">닫기</button>
+        </div>
+        <div id="analysis-range-switch" class="analysis-range-switch" role="radiogroup" aria-label="분석 기간">
+          <label class="analysis-range-option">
+            <input type="radio" name="analysis-range" value="short" checked />
+            <span>단기</span>
+          </label>
+          <label class="analysis-range-option">
+            <input type="radio" name="analysis-range" value="medium" />
+            <span>중기</span>
+          </label>
+          <label class="analysis-range-option">
+            <input type="radio" name="analysis-range" value="long" />
+            <span>장기</span>
+          </label>
         </div>
         <div id="analysis-body" class="analysis-body"></div>
       </div>

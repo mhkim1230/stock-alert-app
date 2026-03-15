@@ -14,6 +14,7 @@ const state = {
   selectedAlertSymbol: "",
   selectedFxPair: null,
   lastFxLookup: { base: "USD", target: "KRW" },
+  analysisContext: null,
 };
 
 const loadingState = {
@@ -58,6 +59,7 @@ const elements = {
   quickFxTarget: document.getElementById("quick-fx-target"),
   quickFxAlertForm: document.getElementById("quick-fx-alert-form"),
   analysisModal: document.getElementById("analysis-modal"),
+  analysisRangeSwitch: document.getElementById("analysis-range-switch"),
   analysisBody: document.getElementById("analysis-body"),
 };
 
@@ -219,15 +221,6 @@ function setView(name) {
     panel.classList.toggle("active", panel.dataset.viewPanel === nextView);
   });
   window.location.hash = nextView;
-}
-
-function setAssetView(name) {
-  document.querySelectorAll(".asset-tab-button").forEach((button) => {
-    button.classList.toggle("active", button.dataset.assetView === name);
-  });
-  document.querySelectorAll(".asset-view").forEach((panel) => {
-    panel.classList.toggle("active", panel.dataset.assetPanel === name);
-  });
 }
 
 function getStockAlertCount(symbol) {
@@ -484,12 +477,15 @@ function renderAnalysisAlertCard({ label, value, priceUnit, assetType, symbol, b
 
 function renderAnalysis(data) {
   const formatter = data.asset_type === "currency" ? formatRate : formatPrice;
+  const analysisContext = state.analysisContext || {};
+  const analysisBase = analysisContext.base || data.symbol.split("/")[0];
+  const analysisTarget = analysisContext.target || data.symbol.split("/")[1];
   const indicatorRows = [
     { label: "거래량 신호", value: data.volume_signal || "데이터 없음" },
     { label: "거래량 비율", value: data.volume_ratio ? `${data.volume_ratio.toFixed(2)}배` : "-" },
     { label: "RSI(14)", value: data.rsi14 ?? "-" },
     { label: "MACD", value: data.macd ?? "-" },
-    { label: "MACD Signal", value: data.macd_signal ?? "-" },
+    { label: "MACD 신호선", value: data.macd_signal ?? "-" },
     { label: "ATR(14)", value: data.atr14 ?? "-" },
   ];
 
@@ -532,8 +528,8 @@ function renderAnalysis(data) {
       priceUnit: data.price_unit,
       assetType: data.asset_type,
       symbol: data.symbol,
-      base: data.symbol.split("/")[0],
-      target: data.symbol.split("/")[1],
+      base: analysisBase,
+      target: analysisTarget,
       condition: "below",
       formatter,
     }),
@@ -543,8 +539,8 @@ function renderAnalysis(data) {
       priceUnit: data.price_unit,
       assetType: data.asset_type,
       symbol: data.symbol,
-      base: data.symbol.split("/")[0],
-      target: data.symbol.split("/")[1],
+      base: analysisBase,
+      target: analysisTarget,
       condition: "below",
       formatter,
     }),
@@ -554,8 +550,8 @@ function renderAnalysis(data) {
       priceUnit: data.price_unit,
       assetType: data.asset_type,
       symbol: data.symbol,
-      base: data.symbol.split("/")[0],
-      target: data.symbol.split("/")[1],
+      base: analysisBase,
+      target: analysisTarget,
       condition: "above",
       formatter,
     }),
@@ -565,8 +561,8 @@ function renderAnalysis(data) {
       priceUnit: data.price_unit,
       assetType: data.asset_type,
       symbol: data.symbol,
-      base: data.symbol.split("/")[0],
-      target: data.symbol.split("/")[1],
+      base: analysisBase,
+      target: analysisTarget,
       condition: "above",
       formatter,
     }),
@@ -824,12 +820,14 @@ function closeFxAlertModal() {
 }
 
 function openAnalysisModal() {
+  syncAnalysisRangeSwitch();
   elements.analysisModal.classList.remove("hidden");
 }
 
 function closeAnalysisModal() {
   elements.analysisModal.classList.add("hidden");
   elements.analysisBody.innerHTML = "";
+  state.analysisContext = null;
 }
 
 function renderStockSearchResults(results) {
@@ -893,9 +891,14 @@ async function handleFxLookup(event) {
         loadingMessage: "환율을 조회하는 중입니다...",
       });
       elements.fxResult.innerHTML = `
-        <div class="stat-card">
+        <div class="stat-card stat-card-action">
           <small>${payload.source}</small>
           <strong>${payload.base_currency}/${payload.target_currency} ${formatRate(payload.rate, payload.target_currency)}</strong>
+          <div class="resource-actions compact-actions">
+            <button class="ghost-button small inline-action-button" type="button" data-action="add-current-fx-pair">관심환율 추가</button>
+            <button class="ghost-button small inline-action-button" type="button" data-action="open-current-fx-analysis">상세분석</button>
+            <button class="ghost-button small inline-action-button" type="button" data-action="open-current-fx-alert">알림 추가</button>
+          </div>
         </div>
       `;
     });
@@ -1049,27 +1052,55 @@ async function handleQuickFxAlertSubmit(event) {
 }
 
 async function openStockAnalysis(symbol, market = "") {
+  state.analysisContext = {
+    assetType: "stock",
+    symbol,
+    market,
+    period: state.analysisContext?.assetType === "stock" && state.analysisContext?.symbol === symbol ? state.analysisContext.period : "short",
+  };
   openAnalysisModal();
-  showLoadingCard(elements.analysisBody, "주식 차트를 분석하는 중입니다...");
-  try {
-    const qs = market ? `?market=${encodeURIComponent(market)}` : "";
-    const payload = await request(`/analysis/stocks/${encodeURIComponent(symbol)}${qs}`, {
-      loadingMessage: "주식 상세분석을 준비하는 중입니다...",
-    });
-    renderAnalysis(payload);
-  } catch (error) {
-    showLoadingCard(elements.analysisBody, error.message);
-    showToast(error.message, "error");
-  }
+  await loadCurrentAnalysis();
 }
 
 async function openFxAnalysis(base, target) {
+  state.analysisContext = {
+    assetType: "currency",
+    base,
+    target,
+    period: state.analysisContext?.assetType === "currency" && state.analysisContext?.base === base && state.analysisContext?.target === target ? state.analysisContext.period : "short",
+  };
   openAnalysisModal();
-  showLoadingCard(elements.analysisBody, "환율 흐름을 분석하는 중입니다...");
+  await loadCurrentAnalysis();
+}
+
+function syncAnalysisRangeSwitch() {
+  const current = state.analysisContext?.period || "short";
+  elements.analysisRangeSwitch.querySelectorAll("input[name='analysis-range']").forEach((input) => {
+    input.checked = input.value === current;
+  });
+}
+
+async function loadCurrentAnalysis() {
+  if (!state.analysisContext) {
+    return;
+  }
+
+  const { assetType, symbol, market, base, target, period } = state.analysisContext;
+  const basisLabel = period === "medium" ? "주봉" : period === "long" ? "월봉" : "일봉";
+  showLoadingCard(elements.analysisBody, `${basisLabel} 기준으로 상세분석을 준비하는 중입니다...`);
+
   try {
-    const payload = await request(`/analysis/currencies/${encodeURIComponent(base)}/${encodeURIComponent(target)}`, {
-      loadingMessage: "환율 상세분석을 준비하는 중입니다...",
-    });
+    let payload;
+    if (assetType === "stock") {
+      const qs = market ? `?market=${encodeURIComponent(market)}` : "";
+      payload = await request(`/analysis/stocks/${encodeURIComponent(symbol)}/${period}${qs}`, {
+        loadingMessage: `${basisLabel} 기준 주식 상세분석을 준비하는 중입니다...`,
+      });
+    } else {
+      payload = await request(`/analysis/currencies/${encodeURIComponent(base)}/${encodeURIComponent(target)}/${period}`, {
+        loadingMessage: `${basisLabel} 기준 환율 상세분석을 준비하는 중입니다...`,
+      });
+    }
     renderAnalysis(payload);
   } catch (error) {
     showLoadingCard(elements.analysisBody, error.message);
@@ -1111,11 +1142,6 @@ async function handleListActions(event) {
       closeStockSearchModal();
       return;
     }
-    if (action === "go-to-fx-watchlist") {
-      setView("watchlist");
-      setAssetView("fx");
-      return;
-    }
     if (action === "add-current-fx-pair") {
       const { base, target } = state.lastFxLookup;
       const exists = state.fxWatchlist.some((item) => item.base === base && item.target === target);
@@ -1127,9 +1153,15 @@ async function handleListActions(event) {
         });
         await refreshData();
       }
-      setView("watchlist");
-      setAssetView("fx");
       showToast("현재 환율 페어를 저장했습니다.", "success");
+      return;
+    }
+    if (action === "open-current-fx-analysis") {
+      await openFxAnalysis(state.lastFxLookup.base, state.lastFxLookup.target);
+      return;
+    }
+    if (action === "open-current-fx-alert") {
+      openFxAlertModal(state.lastFxLookup.base, state.lastFxLookup.target);
       return;
     }
     if (action === "open-alert-modal") {
@@ -1184,7 +1216,6 @@ async function handleListActions(event) {
       });
       closeStockSearchModal();
       setView("watchlist");
-      setAssetView("stocks");
       await refreshData();
       showToast("관심종목을 추가했습니다.", "success");
       return;
@@ -1292,12 +1323,8 @@ function setupRouting() {
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.addEventListener("click", () => setView(button.dataset.view));
   });
-  document.querySelectorAll(".asset-tab-button").forEach((button) => {
-    button.addEventListener("click", () => setAssetView(button.dataset.assetView));
-  });
   const initialView = window.location.hash.replace("#", "") || "dashboard";
   setView(initialView);
-  setAssetView("stocks");
 }
 
 function setupServiceWorker() {
@@ -1309,7 +1336,6 @@ function setupServiceWorker() {
 document.getElementById("stock-search-form").addEventListener("submit", handleStockSearch);
 document.getElementById("fx-form").addEventListener("submit", handleFxLookup);
 document.getElementById("news-form").addEventListener("submit", handleNewsSearch);
-document.getElementById("fx-watchlist-form").addEventListener("submit", handleFxWatchlistSubmit);
 document.getElementById("quick-stock-alert-form").addEventListener("submit", handleQuickStockAlertSubmit);
 document.getElementById("quick-news-alert-form").addEventListener("submit", handleQuickNewsAlertSubmit);
 document.getElementById("quick-fx-alert-form").addEventListener("submit", handleQuickFxAlertSubmit);
@@ -1318,6 +1344,14 @@ document.getElementById("stock-search-modal").addEventListener("click", handleLi
 document.getElementById("stock-alert-modal").addEventListener("click", handleListActions);
 document.getElementById("fx-alert-modal").addEventListener("click", handleListActions);
 document.getElementById("analysis-modal").addEventListener("click", handleListActions);
+elements.analysisRangeSwitch.addEventListener("change", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || target.name !== "analysis-range" || !target.checked || !state.analysisContext) {
+    return;
+  }
+  state.analysisContext.period = target.value;
+  await loadCurrentAnalysis();
+});
 elements.loginForm.addEventListener("submit", handleLogin);
 elements.logoutButton.addEventListener("click", handleLogout);
 elements.settingsLogoutButton.addEventListener("click", handleLogout);

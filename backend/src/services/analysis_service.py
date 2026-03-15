@@ -16,14 +16,19 @@ class AnalysisService:
         self.news_service = NewsService()
         self.stock_service = StockService()
 
-    async def get_stock_analysis(self, symbol: str, market: Optional[str] = None) -> Optional[Dict]:
+    async def get_stock_analysis(self, symbol: str, market: Optional[str] = None, period: str = "short") -> Optional[Dict]:
         quote = await self.stock_service.get_stock_quote(symbol)
         stock_name = str(quote.get("name") or symbol.upper()) if quote else symbol.upper()
         stock_market = market or (quote.get("market") if quote else None)
         price_unit = str(quote.get("currency") or ("USD" if not symbol.isdigit() else "KRW")) if quote else ("USD" if not symbol.isdigit() else "KRW")
+        analysis_window = self._get_analysis_window(period)
 
         yahoo_symbol = await self._resolve_stock_symbol(symbol, stock_market)
-        history = await self._fetch_history(yahoo_symbol)
+        history = await self._fetch_history(
+            yahoo_symbol,
+            range_value=analysis_window["range"],
+            interval_value=analysis_window["interval"],
+        )
         if not history:
             return None
         if symbol.isdigit():
@@ -38,14 +43,19 @@ class AnalysisService:
             name=stock_name,
             price_unit=price_unit,
             source=f"yahoo_chart:{yahoo_symbol}",
-            timeframe="최근 6개월 일봉",
+            timeframe=analysis_window["label"],
             investor_flow=investor_flow,
             news_context=news_context,
         )
 
-    async def get_currency_analysis(self, base: str, target: str) -> Optional[Dict]:
+    async def get_currency_analysis(self, base: str, target: str, period: str = "short") -> Optional[Dict]:
         pair = f"{base.upper()}{target.upper()}=X"
-        history = await self._fetch_history(pair)
+        analysis_window = self._get_analysis_window(period)
+        history = await self._fetch_history(
+            pair,
+            range_value=analysis_window["range"],
+            interval_value=analysis_window["interval"],
+        )
         if not history:
             return None
         news_context = await self._build_news_context(
@@ -60,7 +70,7 @@ class AnalysisService:
             name=f"{base.upper()}/{target.upper()}",
             price_unit=target.upper(),
             source=f"yahoo_chart:{pair}",
-            timeframe="최근 6개월 일봉",
+            timeframe=analysis_window["label"],
             investor_flow=None,
             news_context=news_context,
         )
@@ -79,15 +89,15 @@ class AnalysisService:
             candidates = [f"{normalized}.KS", f"{normalized}.KQ"]
 
         for candidate in candidates:
-            history = await self._fetch_history(candidate)
+            history = await self._fetch_history(candidate, range_value="1mo", interval_value="1d")
             if history:
                 return candidate
         return candidates[0]
 
-    async def _fetch_history(self, yahoo_symbol: str) -> List[Dict[str, float]]:
+    async def _fetch_history(self, yahoo_symbol: str, range_value: str = "6mo", interval_value: str = "1d") -> List[Dict[str, float]]:
         url = (
             "https://query1.finance.yahoo.com/v8/finance/chart/"
-            f"{yahoo_symbol}?range=6mo&interval=1d&includePrePost=false"
+            f"{yahoo_symbol}?range={range_value}&interval={interval_value}&includePrePost=false"
         )
         timeout = aiohttp.ClientTimeout(total=settings.request_timeout)
 
@@ -127,6 +137,16 @@ class AnalysisService:
                 }
             )
         return candles
+
+    @staticmethod
+    def _get_analysis_window(period: str) -> Dict[str, str]:
+        normalized = (period or "short").lower()
+        mapping = {
+            "short": {"range": "6mo", "interval": "1d", "label": "단기 · 일봉 기준 최근 6개월"},
+            "medium": {"range": "2y", "interval": "1wk", "label": "중기 · 주봉 기준 최근 2년"},
+            "long": {"range": "5y", "interval": "1mo", "label": "장기 · 월봉 기준 최근 5년"},
+        }
+        return mapping.get(normalized, mapping["short"])
 
     async def _fetch_investor_flow(self, symbol: str) -> Optional[Dict]:
         url = f"https://finance.naver.com/item/main.naver?code={symbol}"

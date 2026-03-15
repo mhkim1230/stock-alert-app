@@ -16,7 +16,19 @@ analysis_service = AnalysisService()
     dependencies=[Depends(require_session_or_admin)],
 )
 async def get_stock_analysis(symbol: str, market: Optional[str] = None):
-    analysis = await analysis_service.get_stock_analysis(symbol, market=market)
+    analysis = await analysis_service.get_stock_analysis(symbol, market=market, period="short")
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Stock analysis not found")
+    return analysis
+
+
+@router.get(
+    "/stocks/{symbol}/{period}",
+    response_model=TechnicalAnalysisResponse,
+    dependencies=[Depends(require_session_or_admin)],
+)
+async def get_stock_analysis_by_period(symbol: str, period: str, market: Optional[str] = None):
+    analysis = await analysis_service.get_stock_analysis(symbol, market=market, period=period)
     if not analysis:
         raise HTTPException(status_code=404, detail="Stock analysis not found")
     return analysis
@@ -28,7 +40,19 @@ async def get_stock_analysis(symbol: str, market: Optional[str] = None):
     dependencies=[Depends(require_session_or_admin)],
 )
 async def get_currency_analysis(base: str, target: str):
-    analysis = await analysis_service.get_currency_analysis(base, target)
+    analysis = await analysis_service.get_currency_analysis(base, target, period="short")
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Currency analysis not found")
+    return analysis
+
+
+@router.get(
+    "/currencies/{base}/{target}/{period}",
+    response_model=TechnicalAnalysisResponse,
+    dependencies=[Depends(require_session_or_admin)],
+)
+async def get_currency_analysis_by_period(base: str, target: str, period: str):
+    analysis = await analysis_service.get_currency_analysis(base, target, period=period)
     if not analysis:
         raise HTTPException(status_code=404, detail="Currency analysis not found")
     return analysis

@@ -419,35 +419,6 @@ button:disabled {
   max-height: min(44vh, 340px);
 }
 
-.asset-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.asset-tab-button {
-  border: 1px solid rgba(17, 43, 31, 0.08);
-  background: rgba(255, 250, 240, 0.7);
-  color: var(--muted);
-  border-radius: 999px;
-  padding: 10px 12px;
-}
-
-.asset-tab-button.active {
-  background: rgba(17, 43, 31, 0.12);
-  color: var(--text);
-  border-color: rgba(17, 43, 31, 0.18);
-}
-
-.asset-view {
-  display: none;
-}
-
-.asset-view.active {
-  display: block;
-}
-
 .nested-card {
   padding: 14px;
   border-radius: 18px;
@@ -462,6 +433,16 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 20px;
+}
+
+#analysis-modal {
+  z-index: 1100;
+}
+
+#stock-alert-modal,
+#fx-alert-modal,
+#stock-search-modal {
+  z-index: 1200;
 }
 
 .modal-backdrop {
@@ -481,6 +462,56 @@ button:disabled {
   border: 1px solid var(--border);
   background: #fffaf0;
   box-shadow: var(--shadow);
+}
+
+.analysis-modal-card {
+  padding-top: 0;
+}
+
+.modal-sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 -18px 12px;
+  padding: 18px 18px 12px;
+  background: rgba(255, 250, 240, 0.96);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(17, 43, 31, 0.08);
+}
+
+.analysis-range-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.analysis-range-option {
+  position: relative;
+  display: block;
+}
+
+.analysis-range-option input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.analysis-range-option span {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(17, 43, 31, 0.08);
+  background: rgba(255, 250, 240, 0.82);
+  color: var(--muted);
+}
+
+.analysis-range-option input:checked + span {
+  background: rgba(17, 43, 31, 0.12);
+  color: var(--text);
+  border-color: rgba(17, 43, 31, 0.18);
 }
 
 .toast-root {
@@ -698,7 +729,6 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .asset-tabs,
   .analysis-grid,
   .compact-analysis-grid {
     grid-template-columns: 1fr;
@@ -712,6 +742,15 @@ button:disabled {
     width: 100%;
     max-height: 88vh;
     padding: 14px;
+  }
+
+  .modal-sticky-head {
+    margin: 0 -14px 12px;
+    padding: 14px 14px 10px;
+  }
+
+  .analysis-range-switch {
+    grid-template-columns: 1fr;
   }
 
   .resource-item {
