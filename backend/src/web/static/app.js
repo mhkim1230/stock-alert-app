@@ -36,9 +36,9 @@ const elements = {
   logoutButton: document.getElementById("logout-button"),
   installButton: document.getElementById("install-button"),
   settingsInstallButton: document.getElementById("settings-install-button"),
+  refreshWatchlistButton: document.getElementById("refresh-watchlist"),
   watchlistList: document.getElementById("watchlist-list"),
   fxWatchlistList: document.getElementById("fx-watchlist-list"),
-  settingsNotifications: document.getElementById("settings-notifications"),
   stockSearchResults: document.getElementById("stock-search-results"),
   fxResult: document.getElementById("fx-result"),
   fxForm: document.getElementById("fx-form"),
@@ -316,7 +316,7 @@ function renderStockWatchlist() {
             `,
             actions: `
               <button class="ghost-button small" type="button" data-action="open-stock-analysis" data-symbol="${escapeHtml(item.symbol)}" data-market="${escapeHtml(market)}">분석</button>
-              <button class="ghost-button small" type="button" data-action="open-alert-modal" data-symbol="${escapeHtml(item.symbol)}">알림</button>
+              <button class="ghost-button small" type="button" data-action="refresh-stock-quote" data-symbol="${escapeHtml(item.symbol)}">갱신</button>
               <button class="danger-button" type="button" data-action="delete-watchlist" data-symbol="${escapeHtml(item.symbol)}">삭제</button>
             `,
           })}
@@ -352,7 +352,6 @@ function renderFxWatchlist() {
             `,
             actions: `
               <button class="ghost-button small" type="button" data-action="open-fx-analysis" data-base="${escapeHtml(item.base)}" data-target="${escapeHtml(item.target)}">분석</button>
-              <button class="ghost-button small" type="button" data-action="open-fx-alert-modal" data-base="${escapeHtml(item.base)}" data-target="${escapeHtml(item.target)}">알림</button>
               <button class="danger-button" type="button" data-action="delete-fx-watchlist" data-base="${escapeHtml(item.base)}" data-target="${escapeHtml(item.target)}">삭제</button>
             `,
           })}
@@ -476,17 +475,11 @@ function prefillFxAlertForm(base, target, preset = {}) {
   conditionSelect.value = preset.condition || "above";
 }
 
-function renderAnalysisAlertCard({ label, value, priceUnit, assetType, symbol, base, target, condition, formatter }) {
-  const action = assetType === "currency" ? "prefill-fx-alert" : "prefill-stock-alert";
-  const attrs = assetType === "currency"
-    ? `data-base="${base}" data-target="${target}" data-target-rate="${value}" data-condition="${condition}"`
-    : `data-symbol="${symbol}" data-target-price="${value}" data-condition="${condition}"`;
-
+function renderAnalysisValueCard({ label, value, priceUnit, formatter }) {
   return `
-    <div class="stat-card stat-card-action">
+    <div class="stat-card">
       <small>${label}</small>
       <strong>${formatter(value, priceUnit)}</strong>
-      <button class="ghost-button small inline-action-button" type="button" data-action="${action}" ${attrs}>알림 추가</button>
     </div>
   `;
 }
@@ -516,7 +509,6 @@ function renderCurrentFxResult(payload) {
     actions: `
       <button class="ghost-button small" type="button" data-action="add-current-fx-pair">저장</button>
       <button class="ghost-button small" type="button" data-action="open-current-fx-analysis">분석</button>
-      <button class="ghost-button small" type="button" data-action="open-current-fx-alert">알림</button>
     `,
   });
   bindSwipeCards();
@@ -536,53 +528,29 @@ function renderFxSelectionError(message) {
 
 function renderAnalysis(data) {
   const formatter = data.asset_type === "currency" ? formatRate : formatPrice;
-  const analysisContext = state.analysisContext || {};
-  const analysisBase = analysisContext.base || data.symbol.split("/")[0];
-  const analysisTarget = analysisContext.target || data.symbol.split("/")[1];
-
   const buySellCards = [
-    renderAnalysisAlertCard({
+    renderAnalysisValueCard({
       label: "1차 매수가",
       value: data.first_buy,
       priceUnit: data.price_unit,
-      assetType: data.asset_type,
-      symbol: data.symbol,
-      base: analysisBase,
-      target: analysisTarget,
-      condition: "below",
       formatter,
     }),
-    renderAnalysisAlertCard({
+    renderAnalysisValueCard({
       label: "2차 매수가",
       value: data.second_buy,
       priceUnit: data.price_unit,
-      assetType: data.asset_type,
-      symbol: data.symbol,
-      base: analysisBase,
-      target: analysisTarget,
-      condition: "below",
       formatter,
     }),
-    renderAnalysisAlertCard({
+    renderAnalysisValueCard({
       label: "1차 매도가",
       value: data.first_sell,
       priceUnit: data.price_unit,
-      assetType: data.asset_type,
-      symbol: data.symbol,
-      base: analysisBase,
-      target: analysisTarget,
-      condition: "above",
       formatter,
     }),
-    renderAnalysisAlertCard({
+    renderAnalysisValueCard({
       label: "2차 매도가",
       value: data.second_sell,
       priceUnit: data.price_unit,
-      assetType: data.asset_type,
-      symbol: data.symbol,
-      base: analysisBase,
-      target: analysisTarget,
-      condition: "above",
       formatter,
     }),
   ];
@@ -777,13 +745,6 @@ function renderAll() {
   renderCurrentFxResultFromState();
   renderStockWatchlist();
   renderFxWatchlist();
-  renderNotifications(elements.settingsNotifications);
-  if (state.selectedAlertSymbol) {
-    renderSelectedStockAlerts();
-  }
-  if (state.selectedFxPair) {
-    renderSelectedCurrencyAlerts();
-  }
 }
 
 async function refreshStockQuotes() {
@@ -820,14 +781,9 @@ async function refreshFxRates() {
 }
 
 async function refreshData() {
-  const [watchlist, fxWatchlist, stockAlerts, currencyAlerts, newsAlerts, notifications, unread] = await Promise.all([
+  const [watchlist, fxWatchlist] = await Promise.all([
     request("/watchlist", { loadingMessage: "관심종목을 불러오는 중입니다..." }),
     request("/watchlist/fx", { loadingMessage: "관심환율을 불러오는 중입니다..." }),
-    request("/alerts/stocks", { loadingMessage: "주식 알림을 불러오는 중입니다..." }),
-    request("/alerts/currencies", { loadingMessage: "환율 알림을 불러오는 중입니다..." }),
-    request("/alerts/news", { loadingMessage: "뉴스 알림을 불러오는 중입니다..." }),
-    request("/notifications", { loadingMessage: "알림 기록을 불러오는 중입니다..." }),
-    request("/notifications/unread-count", { loadingMessage: "읽지 않은 알림 수를 확인하는 중입니다..." }),
   ]);
 
   state.watchlist = watchlist;
@@ -836,11 +792,6 @@ async function refreshData() {
     base: item.base_currency,
     target: item.target_currency,
   }));
-  state.stockAlerts = stockAlerts;
-  state.currencyAlerts = currencyAlerts;
-  state.newsAlerts = newsAlerts;
-  state.notifications = notifications;
-  state.unreadCount = unread.unread_count;
 
   await Promise.all([refreshStockQuotes(), refreshFxRates()]);
   renderAll();
@@ -982,7 +933,6 @@ function renderStockSearchResults(results) {
           <div class="resource-actions">
             <button class="primary-button small-button" type="button" data-action="add-watchlist-symbol" data-symbol="${item.symbol}">추가</button>
             <button class="ghost-button small" type="button" data-action="open-stock-analysis" data-symbol="${item.symbol}" data-market="${item.market || ""}">상세분석</button>
-            <button class="ghost-button small" type="button" data-action="open-alert-modal" data-symbol="${item.symbol}">알림</button>
           </div>
         </li>
       `
@@ -1335,6 +1285,17 @@ async function handleListActions(event) {
       await openFxAnalysis(trigger.dataset.base, trigger.dataset.target);
       return;
     }
+    if (action === "refresh-stock-quote") {
+      await withButtonBusy(trigger, "갱신 중...", async () => {
+        const quote = await request(`/stocks/${encodeURIComponent(trigger.dataset.symbol)}`, {
+          loadingMessage: "현재가를 다시 불러오는 중입니다...",
+        });
+        state.stockQuotes[trigger.dataset.symbol] = quote;
+      });
+      renderStockWatchlist();
+      showToast("현재가를 갱신했습니다.", "success");
+      return;
+    }
     if (action === "close-analysis-modal") {
       closeAnalysisModal();
       return;
@@ -1502,6 +1463,13 @@ elements.fxBaseSelect.addEventListener("blur", handleFxSelectionChange);
 elements.fxTargetSelect.addEventListener("blur", handleFxSelectionChange);
 elements.loginForm.addEventListener("submit", handleLogin);
 elements.logoutButton.addEventListener("click", handleLogout);
+elements.refreshWatchlistButton?.addEventListener("click", async () => {
+  await withButtonBusy(elements.refreshWatchlistButton, "갱신 중...", async () => {
+    await refreshStockQuotes();
+  });
+  renderStockWatchlist();
+  showToast("관심종목 현재가를 갱신했습니다.", "success");
+});
 elements.refreshDashboard.addEventListener("click", async () => {
   await withButtonBusy(elements.refreshDashboard, "새로고침 중...", async () => {
     await refreshData();

@@ -121,7 +121,10 @@
                     <p class="eyebrow">관심종목</p>
                     <h3>관심주식</h3>
                   </div>
-                  <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
+                  <div class="resource-actions">
+                    <button id="refresh-watchlist" class="ghost-button small" type="button" title="현재가 갱신">↻</button>
+                    <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
+                  </div>
                 </div>
                 <ul id="watchlist-list" class="resource-list scroll-area tall"></ul>
               </div>
@@ -142,16 +145,6 @@
                     </div>
                     <button id="settings-install-button" class="primary-button hidden" type="button">이 기기에 설치</button>
                   </div>
-                </article>
-
-                <article class="panel-card">
-                  <div class="panel-head">
-                    <div>
-                      <p class="eyebrow">알림</p>
-                      <h3>최근 알림 기록</h3>
-                    </div>
-                  </div>
-                  <ul id="settings-notifications" class="timeline-list scroll-area tall"></ul>
                 </article>
               </div>
             </section>
