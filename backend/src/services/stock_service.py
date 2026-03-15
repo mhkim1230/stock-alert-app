@@ -17,6 +17,9 @@ class StockService:
             price = self._coerce_float(item.get("current_price") or item.get("price"))
             if price is None:
                 continue
+            raw_change_percent = item.get("change_percent")
+            if raw_change_percent is None:
+                raw_change_percent = item.get("changeRate")
             normalized.append(
                 {
                     "symbol": str(item.get("symbol") or item.get("code") or query).upper(),
@@ -24,9 +27,7 @@ class StockService:
                     "market": item.get("market"),
                     "price": price,
                     "change": self._coerce_float(item.get("change")),
-                    "change_percent": self._coerce_float(
-                        item.get("change_percent") or item.get("changeRate")
-                    ),
+                    "change_percent": self._coerce_float(raw_change_percent),
                     "currency": item.get("currency", "KRW"),
                     "source": item.get("source", "naver"),
                 }
@@ -43,7 +44,9 @@ class StockService:
     async def _enrich_missing_domestic_change(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         async def enrich(item: Dict[str, Any]) -> Dict[str, Any]:
             symbol = str(item.get("symbol") or "")
-            if not symbol.isdigit() or item.get("change_percent") is not None:
+            if not symbol.isdigit():
+                return item
+            if item.get("source") != "naver_search_card" and item.get("change_percent") is not None:
                 return item
             detailed = await self.naver._get_korean_stock_by_code(symbol)
             if detailed and detailed.get("change_percent") is not None:

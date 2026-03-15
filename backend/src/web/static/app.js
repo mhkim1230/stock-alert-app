@@ -172,9 +172,6 @@ function formatChangePercent(value) {
   if (!Number.isFinite(numeric)) {
     return "";
   }
-  if (numeric === 0) {
-    return "보합";
-  }
   return `${numeric > 0 ? "+" : ""}${numeric.toFixed(2)}%`;
 }
 
@@ -228,11 +225,12 @@ function stockQuoteMarkup(symbol) {
     return `<small class="meta-line">시세를 아직 불러오지 못했습니다.</small>`;
   }
   const changeClass = Number(quote.change_percent) > 0 ? "up" : Number(quote.change_percent) < 0 ? "down" : "";
+  const changeText = formatChangePercent(quote.change_percent);
   return `
     <small class="meta-line">${quote.name || symbol} · ${quote.market || "-"}</small>
     <div class="quote-line">
       <span class="quote-price">${formatPrice(quote.price, quote.currency || "KRW")}</span>
-      <span class="quote-change ${changeClass}">${formatChangePercent(quote.change_percent) || "보합"}</span>
+      ${changeText ? `<span class="quote-change ${changeClass}">${changeText}</span>` : ""}
     </div>
   `;
 }
@@ -829,19 +827,22 @@ function renderStockSearchResults(results) {
 
   elements.stockSearchResults.innerHTML = results
     .map(
-      (item) => `
+      (item) => {
+        const changeText = formatChangePercent(item.change_percent);
+        return `
         <li class="resource-item quote-item">
           <div class="resource-meta">
             <strong class="resource-title">${item.symbol} · ${item.name}</strong>
             <small class="meta-line">${item.market || "-"} · ${formatPrice(item.price, item.currency || "KRW")}</small>
-            <small class="meta-line">${formatChangePercent(item.change_percent) || "등락률 정보 없음"} · ${item.source}</small>
+            <small class="meta-line">${changeText ? `${changeText} · ` : ""}${item.source}</small>
           </div>
           <div class="resource-actions">
             <button class="primary-button small-button" type="button" data-action="add-watchlist-symbol" data-symbol="${item.symbol}">추가</button>
-            <button class="ghost-button small" type="button" data-action="open-stock-analysis" data-symbol="${item.symbol}" data-market="${item.market || ""}">상세분석</button>
+            <button class="ghost-button small-button" type="button" data-action="open-stock-analysis" data-symbol="${item.symbol}" data-market="${item.market || ""}">상세분석</button>
           </div>
         </li>
-      `
+      `;
+      }
     )
     .join("");
 }

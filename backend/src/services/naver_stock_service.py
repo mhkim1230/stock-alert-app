@@ -289,15 +289,19 @@ class NaverStockService:
             symbol = self._extract_search_card_symbol(card, query)
             market = self._extract_search_card_market(card, symbol, currency)
 
-            change_percent = 0.0
+            parsed_change_percent = None
             for change_elem in card.select(".stock_quote .n_ch em, .stock_quote em"):
                 change_text = change_elem.get_text(" ", strip=True)
                 if "%" not in change_text:
                     continue
                 parsed_change = self._parse_percent_value(change_text)
                 if parsed_change is not None:
-                    change_percent = parsed_change
+                    parsed_change_percent = parsed_change
                     break
+
+            # 국내 주식은 검색 카드의 개장전 0.00%가 자주 섞여서 내려오므로
+            # 상세 페이지 파싱으로 한 번 더 보강하도록 비워 둡니다.
+            change_percent = None if symbol.isdigit() and currency == "KRW" else parsed_change_percent
 
             result = {
                 "symbol": symbol,
@@ -394,7 +398,7 @@ class NaverStockService:
                 'name_kr': stock_name,
                 'market': market,
                 'current_price': current_price,
-                'change_percent': change_percent if change_percent is not None else 0.0,
+                'change_percent': change_percent,
                 'timestamp': None,
                 'source': 'naver_world_dynamic_parsing'
             }
@@ -620,7 +624,7 @@ class NaverStockService:
                 'name_kr': stock_name,
                 'market': market,
                 'current_price': current_price,
-                'change_percent': change_percent if change_percent is not None else 0.0,
+                'change_percent': change_percent,
                 'timestamp': None,
                 'source': 'naver_dynamic_parsing'
             }
@@ -720,40 +724,112 @@ class NaverStockService:
             return None
 
     def _extract_change_percent(self, soup: BeautifulSoup) -> Optional[float]:
-        """변동률 추출 (기존 개선된 로직 유지)"""
+        """변동률 추출
+
+        개장전 페이지에서는 현재 블록에 0.00%가 먼저 보이고, 직전 정규장 등락률이
+        같은 문서 안에 함께 들어오는 경우가 있습니다. 이때 실제 거래가 있었던 후보를 우선 선택합니다.
+        """
         try:
-            # .no_exday 영역에서 변동률 추출
-            exday_container = soup.select_one('.no_exday')
-            if exday_container:
-                exday_text = exday_container.get_text(strip=True)
-                
-                # 상승/하락 판단
-                is_rise = '상승' in exday_text
-                is_decline = '하락' in exday_text
-                
-                # blind 요소들에서 변동률 후보 찾기
-                blind_elements = exday_container.select('.blind')
-                
-                for elem in blind_elements:
-                    text = elem.get_text(strip=True)
-                    
-                    # 소수점이 있는 숫자만 변동률 후보로 간주
-                    if re.match(r'^\d+\.\d+$', text):
-                        try:
-                            value = float(text)
-                            # 합리적인 변동률 범위
-                            if price_config.MIN_CHANGE_PERCENT <= value <= price_config.MAX_CHANGE_PERCENT:
-                                change_percent = -value if is_decline else value
-                                self.logger.info(f"✅ 변동률 추출: {change_percent}%")
-                                return change_percent
-                        except ValueError:
-                            continue
-            
-            return 0.0
-            
+            candidates = []
+            for selector in ('.rate_info', '.today', '.new_totalinfo', '.no_exday'):
+                for container in soup.select(selector):
+                    candidate = self._extract_change_candidate(container)
+                    if candidate:
+                        candidates.append(candidate)
+
+            if not candidates:
+                return None
+
+            best_candidate = sorted(
+                candidates,
+                key=lambda item: (
+                    item["score"],
+                    item["volume"],
+                    abs(item["change_percent"]),
+                ),
+                reverse=True,
+            )[0]
+            self.logger.info(
+                "✅ 변동률 추출: %s%% (score=%s, volume=%s, preopen=%s)",
+                best_candidate["change_percent"],
+                best_candidate["score"],
+                best_candidate["volume"],
+                best_candidate["is_preopen"],
+            )
+            return best_candidate["change_percent"]
+
         except Exception as e:
             self.logger.error(f"❌ 변동률 추출 오류: {e}")
-            return 0.0
+            return None
+
+    def _extract_change_candidate(self, container: BeautifulSoup) -> Optional[Dict[str, float]]:
+        text = " ".join(container.get_text(" ", strip=True).split())
+        if not text:
+            return None
+
+        blind_values = [
+            elem.get_text(strip=True)
+            for elem in container.select(".blind")
+            if elem.get_text(strip=True)
+        ]
+
+        numeric_candidates = []
+        for raw in blind_values:
+            compact = raw.replace(",", "").strip()
+            if re.fullmatch(r"\d+\.\d+", compact):
+                try:
+                    value = float(compact)
+                except ValueError:
+                    continue
+                if price_config.MIN_CHANGE_PERCENT <= value <= price_config.MAX_CHANGE_PERCENT:
+                    numeric_candidates.append(value)
+
+        if not numeric_candidates:
+            match = re.search(r"([+-]?\d+\.\d+)\s*%", text)
+            if match:
+                try:
+                    parsed = abs(float(match.group(1)))
+                except ValueError:
+                    parsed = None
+                if parsed is not None and price_config.MIN_CHANGE_PERCENT <= parsed <= price_config.MAX_CHANGE_PERCENT:
+                    numeric_candidates.append(parsed)
+
+        if not numeric_candidates:
+            return None
+
+        is_decline = "하락" in text
+        is_rise = "상승" in text
+        is_preopen = "개장전" in text
+        change_percent = numeric_candidates[0]
+        if is_decline:
+            change_percent = -change_percent
+        elif not is_rise and change_percent == 0:
+            change_percent = 0.0
+
+        volume = 0
+        volume_match = re.search(r"거래량\s*([0-9,]+)", text)
+        if volume_match:
+            try:
+                volume = int(volume_match.group(1).replace(",", ""))
+            except ValueError:
+                volume = 0
+
+        score = 0
+        if volume > 0:
+            score += 30
+        if not is_preopen:
+            score += 20
+        if change_percent != 0:
+            score += 10
+        if is_rise or is_decline:
+            score += 5
+
+        return {
+            "change_percent": change_percent,
+            "score": score,
+            "volume": volume,
+            "is_preopen": 1.0 if is_preopen else 0.0,
+        }
 
     def _determine_market(self, soup: BeautifulSoup, code: str) -> str:
         """시장 구분 판단 (코스피/코스닥)"""
@@ -929,7 +1005,7 @@ class NaverStockService:
                 'name_kr': stock_name,
                 'market': market,
                 'current_price': current_price,
-                'change_percent': change_percent if change_percent is not None else 0.0,
+                'change_percent': change_percent,
                 'timestamp': None,
                 'source': 'naver_world_direct_parsing'
             }
