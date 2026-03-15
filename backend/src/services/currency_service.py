@@ -1,6 +1,7 @@
 import logging
 import re
 from typing import Dict, Optional, Union
+from urllib.parse import urlencode
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -15,33 +16,53 @@ class CurrencyService:
     async def get_exchange_rate(
         self, base_currency: str, target_currency: str
     ) -> Optional[Dict[str, Union[float, str]]]:
-        rate = await self._fetch_naver_detail_rate(base_currency, target_currency)
+        base = base_currency.upper()
+        target = target_currency.upper()
+
+        if base == target:
+            return {
+                "base_currency": base,
+                "target_currency": target,
+                "rate": 1.0,
+                "source": "direct",
+            }
+
+        rate = await self._fetch_naver_detail_rate(base, target)
         if rate and rate > 0:
             return {
-                "base_currency": base_currency.upper(),
-                "target_currency": target_currency.upper(),
+                "base_currency": base,
+                "target_currency": target,
                 "rate": float(rate),
                 "source": "naver",
             }
 
-        url = f"https://api.exchangerate.host/convert?from={base_currency.upper()}&to={target_currency.upper()}"
+        rate = await self._fetch_frankfurter_rate(base, target)
+        if rate and rate > 0:
+            return {
+                "base_currency": base,
+                "target_currency": target,
+                "rate": float(rate),
+                "source": "frankfurter",
+            }
+
+        return None
+
+    async def _fetch_frankfurter_rate(self, base_currency: str, target_currency: str) -> Optional[float]:
+        query = urlencode({"base": base_currency.upper(), "symbols": target_currency.upper()})
+        url = f"https://api.frankfurter.dev/v1/latest?{query}"
         try:
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=settings.request_timeout)) as session:
                 async with session.get(url) as response:
                     if response.status != 200:
                         return None
                     data = await response.json()
-                    result = data.get("result")
+                    rates = data.get("rates") or {}
+                    result = rates.get(target_currency.upper())
                     if result is None:
                         return None
-                    return {
-                        "base_currency": base_currency.upper(),
-                        "target_currency": target_currency.upper(),
-                        "rate": float(result),
-                        "source": "exchangerate.host",
-                    }
+                    return float(result)
         except Exception as exc:
-            self.logger.warning("Exchange rate fallback failed: %s", exc)
+            self.logger.warning("Frankfurter FX fallback failed: %s", exc)
             return None
 
     async def _fetch_naver_detail_rate(self, base_currency: str, target_currency: str) -> Optional[float]:
