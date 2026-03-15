@@ -82,6 +82,11 @@ async def root():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/design-samples")
+async def design_samples():
+    return FileResponse(STATIC_DIR / "design-samples.html")
+
+
 @app.get("/manifest.webmanifest")
 async def manifest():
     return FileResponse(STATIC_DIR / "manifest.webmanifest", media_type="application/manifest+json")

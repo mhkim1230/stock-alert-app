@@ -231,11 +231,15 @@ function getCurrencyAlertCount(base, target) {
 function stockQuoteMarkup(symbol) {
   const quote = state.stockQuotes[symbol];
   if (!quote) {
-    return `<small>시세를 아직 불러오지 못했습니다.</small>`;
+    return `<small class="meta-line">시세를 아직 불러오지 못했습니다.</small>`;
   }
+  const changeClass = Number(quote.change_percent) > 0 ? "up" : Number(quote.change_percent) < 0 ? "down" : "";
   return `
-    <small>${quote.market || "-"} · ${formatPrice(quote.price, quote.currency || "KRW")}</small>
-    <small>${formatChangePercent(quote.change_percent)}</small>
+    <small class="meta-line">${quote.name || symbol} · ${quote.market || "-"}</small>
+    <div class="quote-line">
+      <span class="quote-price">${formatPrice(quote.price, quote.currency || "KRW")}</span>
+      <span class="quote-change ${changeClass}">${formatChangePercent(quote.change_percent) || "보합"}</span>
+    </div>
   `;
 }
 
@@ -243,11 +247,13 @@ function fxRateMarkup(base, target) {
   const key = `${base}/${target}`;
   const rate = state.fxRates[key];
   if (!rate) {
-    return `<small>현재 환율을 아직 불러오지 못했습니다.</small>`;
+    return `<small class="meta-line">현재 환율을 아직 불러오지 못했습니다.</small>`;
   }
   return `
-    <small>${formatRate(rate.rate, target)}</small>
-    <small>${rate.source}</small>
+    <small class="meta-line">${rate.source}</small>
+    <div class="quote-line">
+      <span class="quote-price">${formatRate(rate.rate, target)}</span>
+    </div>
   `;
 }
 
@@ -286,10 +292,10 @@ function renderStockWatchlist() {
       return `
         <li class="resource-item quote-item">
           <div class="resource-meta">
-            <strong>${item.symbol}</strong>
+            <strong class="resource-title">${item.symbol}</strong>
             ${stockQuoteMarkup(item.symbol)}
           </div>
-          <div class="resource-actions">
+          <div class="resource-actions compact-actions-row">
             <button class="ghost-button small" type="button" data-action="open-stock-analysis" data-symbol="${item.symbol}" data-market="${market}">상세분석</button>
             <button class="ghost-button small" type="button" data-action="open-alert-modal" data-symbol="${item.symbol}">알림</button>
             <button class="danger-button" type="button" data-action="delete-watchlist" data-symbol="${item.symbol}">삭제</button>
@@ -314,13 +320,11 @@ function renderFxWatchlist() {
       return `
         <li class="resource-item quote-item">
           <div class="resource-meta">
-            <strong>${pair}</strong>
+            <strong class="resource-title">${pair}</strong>
             ${fxRateMarkup(item.base, item.target)}
-            <div class="pill-row">
-              <span class="result-pill">환율알림 ${alertCount}</span>
-            </div>
+            <small class="meta-line">설정된 환율 알림 ${alertCount}개</small>
           </div>
-          <div class="resource-actions">
+          <div class="resource-actions compact-actions-row">
             <button class="ghost-button small" type="button" data-action="open-fx-analysis" data-base="${item.base}" data-target="${item.target}">상세분석</button>
             <button class="ghost-button small" type="button" data-action="open-fx-alert-modal" data-base="${item.base}" data-target="${item.target}">알림</button>
             <button class="danger-button" type="button" data-action="delete-fx-watchlist" data-base="${item.base}" data-target="${item.target}">삭제</button>
