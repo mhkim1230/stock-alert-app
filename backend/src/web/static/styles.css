@@ -387,6 +387,16 @@ button:disabled {
   gap: 8px;
 }
 
+.resource-list > li,
+.timeline-list > li,
+.news-list > li {
+  display: block;
+  margin: 0;
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
+}
+
 .watchlist-panel .resource-list {
   flex: 1;
   max-height: none;
