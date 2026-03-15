@@ -1,4 +1,4 @@
-const CACHE_NAME = "stock-alert-pwa-v1";
+const CACHE_NAME = "stock-alert-pwa-v2";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -8,6 +8,7 @@ const APP_SHELL = [
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
 ];
+const APP_SHELL_PATHS = new Set(APP_SHELL);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -31,6 +32,21 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.pathname.startsWith("/health") || url.pathname.startsWith("/session") || url.pathname.startsWith("/alerts") || url.pathname.startsWith("/watchlist") || url.pathname.startsWith("/notifications") || url.pathname.startsWith("/stocks") || url.pathname.startsWith("/currency") || url.pathname.startsWith("/news")) {
+    return;
+  }
+
+  if (APP_SHELL_PATHS.has(url.pathname)) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
     return;
   }
 
