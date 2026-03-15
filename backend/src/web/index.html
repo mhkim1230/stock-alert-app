@@ -84,8 +84,9 @@
                     <label class="field">
                       <span>대상</span>
                       <select id="fx-target-select" name="target" required>
+                        <option value="" selected disabled>대상 통화 선택</option>
                         <option value="USD">미국 달러 USD</option>
-                        <option value="KRW" selected>대한민국 원 KRW</option>
+                        <option value="KRW">대한민국 원 KRW</option>
                         <option value="JPY">일본 엔 JPY</option>
                         <option value="EUR">유로 EUR</option>
                         <option value="CNY">중국 위안 CNY</option>
@@ -117,12 +118,10 @@
             <section class="view" data-view-panel="watchlist">
               <div class="panel-card watchlist-panel">
                 <div class="panel-head">
-                  <div>
-                    <p class="eyebrow">관심종목</p>
-                    <h3>관심주식</h3>
-                  </div>
                   <div class="resource-actions">
-                    <button id="refresh-watchlist" class="ghost-button small" type="button" title="현재가 갱신">↻</button>
+                    <button id="refresh-watchlist" class="ghost-button icon-button" type="button" title="현재가 갱신" aria-label="현재가 갱신">
+                      <span aria-hidden="true">⟳</span>
+                    </button>
                     <button class="primary-button" type="button" data-action="open-stock-search">종목 검색해서 추가</button>
                   </div>
                 </div>

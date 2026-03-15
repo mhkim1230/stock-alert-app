@@ -15,7 +15,7 @@ const state = {
   installPrompt: null,
   selectedAlertSymbol: "",
   selectedFxPair: null,
-  lastFxLookup: { base: "USD", target: "KRW" },
+  lastFxLookup: { base: "USD", target: "" },
   currentFxResult: null,
   analysisContext: null,
   openSwipeId: "",
@@ -797,6 +797,10 @@ async function refreshData() {
   renderAll();
 }
 
+function hasSelectedFxPair() {
+  return FX_OPTIONS.includes(state.lastFxLookup.base) && FX_OPTIONS.includes(state.lastFxLookup.target);
+}
+
 function showLoggedIn() {
   elements.loginPanel.classList.add("hidden");
   elements.appPanel.classList.remove("hidden");
@@ -820,7 +824,9 @@ async function bootstrap() {
     await migrateLegacyFxWatchlist();
     showLoggedIn();
     await refreshData();
-    await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
+    if (hasSelectedFxPair()) {
+      await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
+    }
   } catch {
     showLoggedOut();
   }
@@ -843,7 +849,9 @@ async function handleLogin(event) {
     form.reset();
     showLoggedIn();
     await refreshData();
-    await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
+    if (hasSelectedFxPair()) {
+      await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
+    }
     showToast("로그인되었습니다.", "success");
   } catch (error) {
     elements.loginError.textContent = error.message;
@@ -970,6 +978,10 @@ async function handleFxLookupWithPair(base, target) {
   state.currentFxResult = null;
   closeSwipeActions();
 
+  if (!base || !target) {
+    renderFxSelectionError("기준 통화와 대상 통화를 선택해 주세요.");
+    return;
+  }
   if (!FX_OPTIONS.includes(base) || !FX_OPTIONS.includes(target)) {
     renderFxSelectionError("지원하지 않는 통화입니다.");
     return;
@@ -1243,40 +1255,6 @@ async function handleListActions(event) {
       await openFxAnalysis(state.lastFxLookup.base, state.lastFxLookup.target);
       return;
     }
-    if (action === "open-current-fx-alert") {
-      openFxAlertModal(state.lastFxLookup.base, state.lastFxLookup.target);
-      return;
-    }
-    if (action === "open-alert-modal") {
-      openStockAlertModal(trigger.dataset.symbol);
-      return;
-    }
-    if (action === "prefill-stock-alert") {
-      openStockAlertModal(trigger.dataset.symbol, {
-        targetPrice: Number(trigger.dataset.targetPrice),
-        condition: trigger.dataset.condition,
-      });
-      return;
-    }
-    if (action === "close-alert-modal") {
-      closeStockAlertModal();
-      return;
-    }
-    if (action === "open-fx-alert-modal") {
-      openFxAlertModal(trigger.dataset.base, trigger.dataset.target);
-      return;
-    }
-    if (action === "prefill-fx-alert") {
-      openFxAlertModal(trigger.dataset.base, trigger.dataset.target, {
-        targetRate: Number(trigger.dataset.targetRate),
-        condition: trigger.dataset.condition,
-      });
-      return;
-    }
-    if (action === "close-fx-alert-modal") {
-      closeFxAlertModal();
-      return;
-    }
     if (action === "open-stock-analysis") {
       await openStockAnalysis(trigger.dataset.symbol, trigger.dataset.market || "");
       return;
@@ -1473,7 +1451,9 @@ elements.refreshWatchlistButton?.addEventListener("click", async () => {
 elements.refreshDashboard.addEventListener("click", async () => {
   await withButtonBusy(elements.refreshDashboard, "새로고침 중...", async () => {
     await refreshData();
-    await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
+    if (hasSelectedFxPair()) {
+      await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
+    }
   });
   showToast("데이터를 새로고침했습니다.", "success");
 });
