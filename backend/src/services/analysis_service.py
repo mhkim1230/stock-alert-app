@@ -24,6 +24,7 @@ class AnalysisService:
         stock_name = str(quote.get("name") or symbol.upper()) if quote else symbol.upper()
         stock_market = market or (quote.get("market") if quote else None)
         price_unit = str(quote.get("currency") or ("USD" if not symbol.isdigit() else "KRW")) if quote else ("USD" if not symbol.isdigit() else "KRW")
+        live_price = float(quote.get("price")) if quote and quote.get("price") is not None else None
         analysis_window = self._get_analysis_window(period)
 
         yahoo_symbol = await self._resolve_stock_symbol(symbol, stock_market)
@@ -55,6 +56,7 @@ class AnalysisService:
             period=period,
             investor_flow=investor_flow,
             news_context=news_context,
+            live_price=live_price,
         )
 
     async def get_currency_analysis(self, base: str, target: str, period: str = "short") -> Optional[Dict]:
@@ -431,6 +433,7 @@ class AnalysisService:
         period: str,
         investor_flow: Optional[Dict],
         news_context: Dict,
+        live_price: Optional[float] = None,
     ) -> Dict:
         closes = [item["close"] for item in history]
         highs = [item["high"] for item in history]
@@ -438,7 +441,7 @@ class AnalysisService:
         volumes = [item.get("volume", 0.0) for item in history]
         profile = self._get_strategy_profile(period)
 
-        current = closes[-1]
+        current = float(live_price) if live_price and live_price > 0 else closes[-1]
         previous_close = closes[-2] if len(closes) > 1 else closes[-1]
         primary_span = min(profile["primary_span"], len(closes))
         secondary_span = min(profile["secondary_span"], len(closes))
@@ -514,11 +517,13 @@ class AnalysisService:
         momentum_score, momentum_reasons, timing_summary = self._score_momentum(
             rsi14=rsi14,
             stochastic=stochastic,
+            period=period,
         )
         volume_score, volume_reasons, volume_summary = self._score_volume(
             volume_ratio=volume_ratio,
             previous_close=previous_close,
             current=current,
+            period=period,
         )
         volatility_score, volatility_reasons, volatility_summary = self._score_volatility(
             current=current,
@@ -536,6 +541,7 @@ class AnalysisService:
             resistances=resistances,
             bollinger=bollinger,
             macd_metrics=macd_metrics,
+            period=period,
         )
         market_context_score = int(news_context.get("market_context_score") or 0)
         market_context_summary = str(news_context.get("market_context_summary") or "")
@@ -1043,9 +1049,11 @@ class AnalysisService:
     def _score_momentum(
         rsi14: Optional[float],
         stochastic: Dict[str, Optional[float]],
+        period: str = "short",
     ) -> Tuple[int, List[str], str]:
         score = 0
         reasons: List[str] = []
+        intraday = (period or "").lower() == "intraday"
 
         if rsi14 is not None:
             if 45 <= rsi14 <= 65:
@@ -1055,13 +1063,13 @@ class AnalysisService:
                 score += 6
                 reasons.append("RSI가 과매도 구간에서 벗어나며 반등 여지가 생기고 있습니다.")
             elif 65 < rsi14 <= 75:
-                score += 4
-                reasons.append("RSI가 강세권에 있지만 과열 직전이라 추격 매수는 조심해야 합니다.")
+                score += 6 if intraday else 4
+                reasons.append("RSI가 강세권에 있어 상승 흐름은 유지되지만 과열 진입 여부는 함께 봐야 합니다.")
             elif rsi14 < 30:
                 score += 4
                 reasons.append("RSI가 과매도권이라 기술적 반등 가능성은 있으나 변동성이 큽니다.")
             else:
-                score += 2
+                score += 3 if intraday else 2
                 reasons.append("RSI가 과열권에 가까워 단기 진입 타이밍은 보수적으로 보는 편이 좋습니다.")
 
         k_value = stochastic.get("k")
@@ -1069,14 +1077,14 @@ class AnalysisService:
         if stochastic.get("golden_cross") and k_value is not None and k_value <= 45:
             score += 8
             reasons.append("스토캐스틱 골든크로스가 저점권에서 나와 단기 반등 타이밍 신호가 살아 있습니다.")
-        elif k_value is not None and d_value is not None and k_value > d_value and k_value < 80:
-            score += 6
+        elif k_value is not None and d_value is not None and k_value > d_value and k_value < (90 if intraday else 80):
+            score += 7 if intraday else 6
             reasons.append("스토캐스틱이 시그널 위에서 움직여 단기 모멘텀이 우호적입니다.")
         elif stochastic.get("dead_cross") and k_value is not None and k_value >= 55:
-            score += 1
+            score += 2 if intraday else 1
             reasons.append("스토캐스틱 데드크로스가 나와 단기 탄력이 둔화되고 있습니다.")
         elif k_value is not None and k_value >= 85:
-            score += 1
+            score += 2 if intraday else 1
             reasons.append("스토캐스틱이 과열권이라 지금은 타이밍을 좇기보다 눌림을 기다리는 편이 좋습니다.")
 
         if rsi14 is not None and rsi14 >= 75:
@@ -1093,10 +1101,12 @@ class AnalysisService:
         volume_ratio: Optional[float],
         previous_close: float,
         current: float,
+        period: str = "short",
     ) -> Tuple[int, List[str], str]:
         score = 0
         reasons: List[str] = []
         price_up = current >= previous_close
+        intraday = (period or "").lower() == "intraday"
 
         if volume_ratio is None:
             return 5, ["거래량 데이터가 제한적이라 신뢰도는 보수적으로 반영했습니다."], "거래량 기준 신뢰도는 제한적으로 해석했습니다."
@@ -1107,6 +1117,12 @@ class AnalysisService:
         elif volume_ratio >= 1.2 and price_up:
             score += 12
             reasons.append("거래량이 평균보다 늘어난 상태라 상승 시도의 신뢰도가 높아졌습니다.")
+        elif intraday and volume_ratio >= 0.6 and price_up:
+            score += 7
+            reasons.append("30분봉 기준 거래량이 아주 강하지는 않지만 상승 흐름을 유지할 정도는 됩니다.")
+        elif intraday and volume_ratio >= 0.45 and price_up:
+            score += 5
+            reasons.append("30분봉 기준 거래량은 평소보다 약하지만 상승 흐름은 이어지고 있습니다.")
         elif 0.9 <= volume_ratio < 1.2:
             score += 9
             reasons.append("거래량이 평균 수준이라 추세 판단의 기본 신뢰도는 유지됩니다.")
@@ -1182,47 +1198,49 @@ class AnalysisService:
         resistances: List[float],
         bollinger: Dict[str, Optional[float]],
         macd_metrics: Dict[str, Optional[float]],
+        period: str = "short",
     ) -> Tuple[int, List[str]]:
         penalty = 0
         reasons: List[str] = []
+        intraday = (period or "").lower() == "intraday"
 
         if current < sma20 < sma60:
-            penalty += 5
+            penalty += 3 if intraday else 5
             reasons.append("현재가가 단기선과 중기선 아래에 있어 추세 역행 진입 위험이 있습니다.")
 
         if resistances:
             gap = abs(resistances[0] - current) / current if current else 0
             if gap <= 0.015:
-                penalty += 4
+                penalty += 2 if intraday else 4
                 reasons.append("가까운 저항선이 바로 위에 있어 상승 여력이 제한될 수 있습니다.")
 
         if rsi14 is not None and rsi14 >= 75:
-            penalty += 4
+            penalty += 2 if intraday else 4
             reasons.append("RSI가 과열권이라 단기 차익 매물이 나올 가능성이 큽니다.")
 
         k_value = stochastic.get("k")
         if stochastic.get("dead_cross") and k_value is not None and k_value >= 75:
-            penalty += 3
+            penalty += 2 if intraday else 3
             reasons.append("스토캐스틱 데드크로스가 과열권에서 나와 단기 타이밍이 불리합니다.")
 
         if investor_flow:
             if investor_flow.get("market_scope") == "domestic" and investor_flow.get("foreign_direction") == investor_flow.get("institution_direction") == "순매도":
-                penalty += 4
+                penalty += 2 if intraday else 4
                 reasons.append("외국인과 기관이 함께 매도 우위라 수급이 받쳐주지 않고 있습니다.")
             elif investor_flow.get("market_scope") == "global" and investor_flow.get("flow_label") == "유출 우위":
-                penalty += 3
+                penalty += 2 if intraday else 3
                 reasons.append("해외 수급 추정상 유출 우위라 단기 추세가 쉽게 꺾일 수 있습니다.")
 
         if news_context.get("news_bias") == "부담":
-            penalty += 4
+            penalty += 2 if intraday else 4
             reasons.append(news_context.get("summary") or "뉴스·국제정세 부담이 단기 변동성을 키우고 있습니다.")
 
         if bollinger.get("position") is not None and bollinger["position"] >= 0.95:
-            penalty += 2
+            penalty += 1 if intraday else 2
             reasons.append("볼린저밴드 상단 과열 구간에 가까워 단기 되돌림이 나올 수 있습니다.")
 
         if macd_metrics.get("dead_cross"):
-            penalty += 3
+            penalty += 2 if intraday else 3
             reasons.append("MACD 데드크로스가 확인돼 추세 탄력이 약해지고 있습니다.")
 
         return min(20, penalty), reasons[:5]
