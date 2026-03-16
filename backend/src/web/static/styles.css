@@ -30,6 +30,7 @@ body {
   margin: 0;
   min-height: 100%;
   overflow-x: hidden;
+  overscroll-behavior-x: none;
   background:
     radial-gradient(circle at top left, rgba(31, 100, 255, 0.08), transparent 30%),
     linear-gradient(180deg, #f8fbff 0%, #f0f4f9 100%);
@@ -1147,10 +1148,12 @@ button:disabled {
   }
 
   .modal-sticky-head {
-    margin: 0 -14px 12px;
+    margin: 0 0 12px;
     padding: calc(env(safe-area-inset-top) + 10px) 14px 8px;
     align-items: center;
     gap: 8px;
+    width: 100%;
+    max-width: 100%;
   }
 
   .analysis-modal {
@@ -1184,6 +1187,7 @@ button:disabled {
 
   .analysis-body {
     padding-top: 22px;
+    padding-inline: 0;
   }
 
   .modal-sticky-head .eyebrow {
