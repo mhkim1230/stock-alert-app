@@ -1,4 +1,5 @@
 import logging
+import math
 import time
 from typing import Any, Dict, List, Optional
 import asyncio
@@ -181,7 +182,7 @@ class StockService:
             previous_close = self._coerce_float(result.get("regularMarketPreviousClose"))
             if price is not None and previous_close not in (None, 0):
                 change_value = price - previous_close
-                change_percent = round((change_value / previous_close) * 100, 2)
+                change_percent = self._truncate_percent((change_value / previous_close) * 100)
                 market = self._normalize_yahoo_market(result.get("fullExchangeName") or result.get("exchange"))
                 return {
                     "name": result.get("shortName") or result.get("longName") or symbol,
@@ -231,7 +232,7 @@ class StockService:
             return None
 
         change_value = price - previous_close
-        change_percent = round((change_value / previous_close) * 100, 2)
+        change_percent = self._truncate_percent((change_value / previous_close) * 100)
         market = self._normalize_yahoo_market(meta.get("exchangeName"))
         return {
             "name": meta.get("shortName") or meta.get("instrumentType") or symbol,
@@ -293,6 +294,12 @@ class StockService:
             "data": dict(quote),
             "expires_at": time.time() + self.quote_cache_ttl,
         }
+
+    @staticmethod
+    def _truncate_percent(value: float) -> float:
+        if value >= 0:
+            return math.floor(value * 100) / 100
+        return math.ceil(value * 100) / 100
 
     @staticmethod
     def _coerce_float(value: Any) -> Optional[float]:

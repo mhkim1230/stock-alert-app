@@ -8,6 +8,7 @@
 """
 
 import asyncio
+import math
 import requests
 import re
 import time
@@ -710,7 +711,11 @@ class NaverStockService:
         volume = int(volume_match.group(1).replace(",", "")) if volume_match else 0
         high_price = float(high_match.group(1).replace(",", "")) if high_match else 0.0
         low_price = float(low_match.group(1).replace(",", "")) if low_match else 0.0
-        change_percent = round(((current_price - previous_close) / previous_close) * 100, 2)
+        parsed_change_percent = self._extract_inline_change_percent(segment)
+        if parsed_change_percent is not None:
+            change_percent = parsed_change_percent
+        else:
+            change_percent = self._truncate_percent(((current_price - previous_close) / previous_close) * 100)
 
         if "전일대비 하락" in segment and change_percent > 0:
             change_percent *= -1
@@ -737,6 +742,26 @@ class NaverStockService:
             "volume": float(volume),
             "score": float(score),
         }
+
+    def _extract_inline_change_percent(self, segment: str) -> Optional[float]:
+        match = re.search(r"([+-]?\d+\.\d+)\s*(?:%|퍼센트)", segment)
+        if not match:
+            return None
+        try:
+            value = float(match.group(1))
+        except ValueError:
+            return None
+        if "전일대비 하락" in segment and value > 0:
+            value *= -1
+        elif "전일대비 상승" in segment and value < 0:
+            value *= -1
+        return self._truncate_percent(value)
+
+    @staticmethod
+    def _truncate_percent(value: float) -> float:
+        if value >= 0:
+            return math.floor(value * 100) / 100
+        return math.ceil(value * 100) / 100
 
     def _extract_stock_name(self, soup: BeautifulSoup, code: str) -> Optional[str]:
         """HTML에서 정확한 종목명 추출"""
