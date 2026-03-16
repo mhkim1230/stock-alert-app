@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, List, Optional
 import asyncio
 import aiohttp
+import requests
 
 from src.config.settings import settings
 from src.services.naver_stock_service import NaverStockService
@@ -93,11 +94,23 @@ class StockService:
                 async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}) as response:
                     if response.status != 200:
                         self.logger.warning("Yahoo quote fetch failed: %s %s", symbol, response.status)
-                        return None
-                    payload = await response.json()
+                        payload = None
+                    else:
+                        payload = await response.json()
         except Exception as exc:
             self.logger.warning("Yahoo quote fetch error for %s: %s", symbol, exc)
-            return None
+            payload = None
+
+        if payload is None:
+            try:
+                response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=settings.request_timeout)
+                if response.status_code != 200:
+                    self.logger.warning("Yahoo quote requests fallback failed: %s %s", symbol, response.status_code)
+                    return None
+                payload = response.json()
+            except Exception as exc:
+                self.logger.warning("Yahoo quote requests fallback error for %s: %s", symbol, exc)
+                return None
 
         result = (((payload or {}).get("chart") or {}).get("result") or [None])[0]
         if not result:
