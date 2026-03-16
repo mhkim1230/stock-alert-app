@@ -29,6 +29,7 @@ html,
 body {
   margin: 0;
   min-height: 100%;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at top left, rgba(31, 100, 255, 0.08), transparent 30%),
     linear-gradient(180deg, #f8fbff 0%, #f0f4f9 100%);
@@ -705,6 +706,8 @@ button:disabled {
 .analysis-modal {
   padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
   align-items: stretch;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 #stock-alert-modal,
@@ -738,6 +741,10 @@ button:disabled {
   max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
   height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
   border-radius: 28px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
 }
 
 .modal-sticky-head {
@@ -786,6 +793,9 @@ button:disabled {
   position: sticky;
   top: calc(env(safe-area-inset-top) + 104px);
   z-index: 1;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .analysis-range-tab {
@@ -810,6 +820,9 @@ button:disabled {
   display: grid;
   gap: 10px;
   padding-top: 18px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .analysis-grid {
@@ -1142,6 +1155,7 @@ button:disabled {
 
   .analysis-modal {
     padding: 0;
+    overflow-x: hidden;
   }
 
   .analysis-modal-card {
@@ -1150,6 +1164,8 @@ button:disabled {
     max-height: 100dvh;
     border-radius: 0;
     border: none;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .analysis-range-switch {
