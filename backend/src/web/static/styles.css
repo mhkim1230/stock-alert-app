@@ -753,6 +753,9 @@ button:disabled {
   top: 0;
   z-index: 2;
   margin: 0 -16px 10px;
+  width: calc(100% - 4px);
+  margin-left: 2px;
+  margin-right: 2px;
   padding: calc(env(safe-area-inset-top) + 16px) 18px 10px;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(14px);
@@ -1148,11 +1151,11 @@ button:disabled {
   }
 
   .modal-sticky-head {
-    margin: 0 0 12px;
+    margin: 0 2px 12px;
     padding: calc(env(safe-area-inset-top) + 10px) 14px 8px;
     align-items: center;
     gap: 8px;
-    width: 100%;
+    width: calc(100% - 4px);
     max-width: 100%;
   }
 
