@@ -224,7 +224,9 @@ class StockService:
 
         meta = chart_result.get("meta") or {}
         price = self._coerce_float(meta.get("regularMarketPrice"))
-        previous_close = self._coerce_float(meta.get("chartPreviousClose") or meta.get("previousClose"))
+        previous_close = self._extract_previous_regular_close(chart_result)
+        if previous_close in (None, 0):
+            previous_close = self._coerce_float(meta.get("regularMarketPreviousClose") or meta.get("chartPreviousClose") or meta.get("previousClose"))
         if price is None or previous_close in (None, 0):
             return None
 
@@ -257,6 +259,24 @@ class StockService:
         if not exchange_name:
             return None
         return mapping.get(str(exchange_name).upper(), str(exchange_name).upper())
+
+    def _extract_previous_regular_close(self, chart_result: Dict[str, Any]) -> Optional[float]:
+        quote = (((chart_result.get("indicators") or {}).get("quote") or [None])[0]) or {}
+        closes = quote.get("close") or []
+        if not closes:
+            return None
+
+        last_non_null: List[float] = []
+        for value in closes:
+            coerced = self._coerce_float(value)
+            if coerced is not None:
+                last_non_null.append(coerced)
+
+        if len(last_non_null) >= 2:
+            return last_non_null[-2]
+        if len(last_non_null) == 1:
+            return last_non_null[0]
+        return None
 
     def _get_cached_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
         cache_key = symbol.upper()
