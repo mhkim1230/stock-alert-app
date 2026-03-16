@@ -47,6 +47,12 @@ const elements = {
   analysisBody: document.getElementById("analysis-body"),
 };
 
+const analysisTouchState = {
+  active: false,
+  x: 0,
+  y: 0,
+};
+
 async function request(path, options = {}) {
   const { loadingMessage = "불러오는 중입니다...", skipLoading = false, ...fetchOptions } = options;
   beginLoading(loadingMessage, skipLoading);
@@ -1200,8 +1206,57 @@ function setupRouting() {
 
 function setupServiceWorker() {
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker
+      .register("/sw.js", { updateViaCache: "none" })
+      .then((registration) => registration.update().catch(() => {}))
+      .catch(() => {});
   }
+}
+
+function setupAnalysisModalTouchLock() {
+  const card = document.querySelector(".analysis-modal-card");
+  if (!card) {
+    return;
+  }
+
+  card.addEventListener(
+    "touchstart",
+    (event) => {
+      const touch = event.touches?.[0];
+      if (!touch) {
+        return;
+      }
+      analysisTouchState.active = true;
+      analysisTouchState.x = touch.clientX;
+      analysisTouchState.y = touch.clientY;
+    },
+    { passive: true }
+  );
+
+  card.addEventListener(
+    "touchmove",
+    (event) => {
+      if (!analysisTouchState.active) {
+        return;
+      }
+      const touch = event.touches?.[0];
+      if (!touch) {
+        return;
+      }
+      const dx = touch.clientX - analysisTouchState.x;
+      const dy = touch.clientY - analysisTouchState.y;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+        event.preventDefault();
+      }
+    },
+    { passive: false }
+  );
+
+  const resetTouch = () => {
+    analysisTouchState.active = false;
+  };
+  card.addEventListener("touchend", resetTouch, { passive: true });
+  card.addEventListener("touchcancel", resetTouch, { passive: true });
 }
 
 document.getElementById("stock-search-form").addEventListener("submit", handleStockSearch);
@@ -1258,5 +1313,6 @@ elements.refreshDashboard.addEventListener("click", async () => {
 setupRouting();
 setupPwaInstall();
 setupServiceWorker();
+setupAnalysisModalTouchLock();
 setupEnterSubmit();
 bootstrap();
