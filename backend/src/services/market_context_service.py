@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from statistics import mean
 from typing import Dict, List, Optional, Tuple
 
@@ -45,8 +46,15 @@ class MarketContextService:
     def __init__(self, news_service: Optional[NewsService] = None) -> None:
         self.logger = logging.getLogger(__name__)
         self.news_service = news_service or NewsService()
+        self.context_cache: Dict[str, Dict[str, object]] = {}
+        self.context_cache_ttl = 60
 
     async def build_context(self, asset_type: str, symbol: str, name: str, market_scope: str = "global") -> Dict:
+        cache_key = f"{asset_type}:{symbol.upper()}:{market_scope}"
+        cached = self._get_cached_context(cache_key)
+        if cached is not None:
+            return cached
+
         related_articles, macro_articles, indicators = await self._collect_inputs(symbol, name, market_scope)
         news_eval = self._evaluate_news(asset_type, related_articles, macro_articles)
         market_eval = self._evaluate_indicators(asset_type, symbol, indicators, market_scope)
@@ -59,7 +67,7 @@ class MarketContextService:
         else:
             market_bias = "중립"
 
-        return {
+        context = {
             "market_context_score": market_context_score,
             "market_context_summary": self._compose_summary(market_eval, news_eval, market_bias),
             "market_bias": market_bias,
@@ -74,6 +82,8 @@ class MarketContextService:
             "related_articles": related_articles,
             "macro_articles": macro_articles,
         }
+        self._save_cached_context(cache_key, context)
+        return context
 
     async def _collect_inputs(self, symbol: str, name: str, market_scope: str) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], Dict[str, Dict]]:
         queries = [symbol]
@@ -242,6 +252,21 @@ class MarketContextService:
             "bias": bias,
             "reasons": reasons[:3],
             "themes": [label for label, _ in sorted_topics[:3]],
+        }
+
+    def _get_cached_context(self, cache_key: str) -> Optional[Dict]:
+        cached = self.context_cache.get(cache_key)
+        if not cached:
+            return None
+        if time.time() > float(cached["expires_at"]):
+            self.context_cache.pop(cache_key, None)
+            return None
+        return dict(cached["data"])  # shallow copy is enough for read-only UI payload
+
+    def _save_cached_context(self, cache_key: str, context: Dict) -> None:
+        self.context_cache[cache_key] = {
+            "data": dict(context),
+            "expires_at": time.time() + self.context_cache_ttl,
         }
 
     def _evaluate_indicators(self, asset_type: str, symbol: str, indicators: Dict[str, Dict], market_scope: str) -> Dict:

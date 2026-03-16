@@ -646,9 +646,16 @@ class NaverStockService:
             if not text:
                 return None
 
-            current_match = re.search(r"현재가\s*([0-9,]+)", text)
-            prev_match = re.search(r"전일가\s*([0-9,]+)", text)
-            volume_match = re.search(r"거래량\s*([0-9,]+)", text)
+            # 네이버 상세 페이지에는 정규장 블록 뒤에 보합 0.00% 보조 블록이
+            # 함께 붙는 경우가 있어서, 실제 시세가 담긴 첫 블록만 사용합니다.
+            today_marker = "오늘의시세"
+            first_today_index = text.find(today_marker)
+            second_today_index = text.find(today_marker, first_today_index + len(today_marker)) if first_today_index >= 0 else -1
+            active_text = text[:second_today_index].strip() if second_today_index > 0 else text
+
+            current_match = re.search(r"현재가\s*([0-9,]+)", active_text)
+            prev_match = re.search(r"전일가\s*([0-9,]+)", active_text)
+            volume_match = re.search(r"거래량\s*([0-9,]+)", active_text)
 
             if not current_match or not prev_match:
                 return None
@@ -660,9 +667,9 @@ class NaverStockService:
                 return None
 
             change_percent = round(((current_price - previous_close) / previous_close) * 100, 2)
-            if "전일대비 하락" in text and change_percent > 0:
+            if "전일대비 하락" in active_text and change_percent > 0:
                 change_percent *= -1
-            if "전일대비 보합" in text:
+            if "전일대비 보합" in active_text and "전일대비 상승" not in active_text and "전일대비 하락" not in active_text:
                 change_percent = 0.0
 
             return {
