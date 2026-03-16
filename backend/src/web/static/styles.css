@@ -884,6 +884,19 @@ button:disabled {
   line-height: 1.35;
 }
 
+.analysis-notes.compact {
+  gap: 4px;
+  font-size: 0.74rem;
+}
+
+.score-detail-card {
+  align-content: start;
+}
+
+.score-detail-card .analysis-notes {
+  margin-top: 6px;
+}
+
 .analysis-details summary {
   cursor: pointer;
   font-weight: 700;

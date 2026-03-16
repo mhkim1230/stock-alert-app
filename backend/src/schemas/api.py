@@ -192,6 +192,10 @@ class TechnicalAnalysisResponse(BaseModel):
     volatility_score: int
     market_context_score: int
     risk_penalty: int
+    weighted_risk_penalty: int
+    price_basis: str
+    market_context_basis: str
+    chart_basis: str
     summary_title: str
     summary_body: str
     trend_outlook: str

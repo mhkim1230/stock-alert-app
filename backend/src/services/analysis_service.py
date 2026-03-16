@@ -223,6 +223,53 @@ class AnalysisService:
         }
         return profiles.get(normalized, profiles["short"])
 
+    @staticmethod
+    def _get_score_profile(period: str) -> Dict[str, float]:
+        normalized = (period or "short").lower()
+        profiles = {
+            "intraday": {
+                "positive_market_multiplier": 1.2,
+                "negative_market_multiplier": 0.45,
+                "risk_multiplier": 0.45,
+                "uptrend_bonus": 10,
+                "sideways_bonus": 2,
+                "volume_confirmation_bonus": 3,
+                "buy_threshold": 52,
+                "sell_threshold": 22,
+            },
+            "short": {
+                "positive_market_multiplier": 1.15,
+                "negative_market_multiplier": 0.6,
+                "risk_multiplier": 0.6,
+                "uptrend_bonus": 8,
+                "sideways_bonus": 2,
+                "volume_confirmation_bonus": 2,
+                "buy_threshold": 56,
+                "sell_threshold": 24,
+            },
+            "medium": {
+                "positive_market_multiplier": 0.9,
+                "negative_market_multiplier": 0.45,
+                "risk_multiplier": 0.55,
+                "uptrend_bonus": 6,
+                "sideways_bonus": 1,
+                "volume_confirmation_bonus": 2,
+                "buy_threshold": 58,
+                "sell_threshold": 26,
+            },
+            "long": {
+                "positive_market_multiplier": 0.6,
+                "negative_market_multiplier": 0.3,
+                "risk_multiplier": 0.4,
+                "uptrend_bonus": 4,
+                "sideways_bonus": 1,
+                "volume_confirmation_bonus": 1,
+                "buy_threshold": 60,
+                "sell_threshold": 28,
+            },
+        }
+        return profiles.get(normalized, profiles["short"])
+
     def _normalize_history_for_period(self, history: List[Dict[str, float]], period: str) -> List[Dict[str, float]]:
         if (period or "").lower() != "long":
             return history
@@ -443,6 +490,7 @@ class AnalysisService:
         lows = [item["low"] for item in history]
         volumes = [item.get("volume", 0.0) for item in history]
         profile = self._get_strategy_profile(period)
+        score_profile = self._get_score_profile(period)
 
         current = float(live_price) if live_price and live_price > 0 else closes[-1]
         previous_close = closes[-2] if len(closes) > 1 else closes[-1]
@@ -548,19 +596,45 @@ class AnalysisService:
         )
         market_context_score = int(news_context.get("market_context_score") or 0)
         market_context_summary = str(news_context.get("market_context_summary") or "")
+        market_context_basis = str(news_context.get("market_context_basis") or "전일 종가 대비 현재 지수·거시 지표")
         macro_reasons = list(news_context.get("macro_reasons") or [])
         news_reasons = list(news_context.get("news_reasons") or [])
+
+        positive_market_bonus = round(max(0, market_context_score) * score_profile["positive_market_multiplier"])
+        negative_market_penalty = round(abs(min(0, market_context_score)) * score_profile["negative_market_multiplier"])
+        weighted_risk_penalty = round(risk_penalty * score_profile["risk_multiplier"])
+        structural_bonus = 0
+        if trend == "상승":
+            structural_bonus += int(score_profile["uptrend_bonus"])
+            if volume_score >= 9:
+                structural_bonus += int(score_profile["volume_confirmation_bonus"])
+            elif volume_score >= 6:
+                structural_bonus += max(1, int(score_profile["volume_confirmation_bonus"]) - 1)
+        elif trend == "횡보":
+            structural_bonus += int(score_profile["sideways_bonus"])
+
+        if market_context_score > 0 and trend == "상승":
+            structural_bonus += 2
+        if market_context_score < 0 and trend == "하락":
+            structural_bonus -= 2
 
         final_score = max(
             0,
             min(
                 100,
-                trend_score + momentum_score + volume_score + volatility_score + market_context_score - risk_penalty,
+                trend_score
+                + momentum_score
+                + volume_score
+                + volatility_score
+                + positive_market_bonus
+                + structural_bonus
+                - negative_market_penalty
+                - weighted_risk_penalty,
             ),
         )
-        if final_score >= 60:
+        if final_score >= score_profile["buy_threshold"]:
             final_action = "매수"
-        elif final_score <= 30:
+        elif final_score <= score_profile["sell_threshold"]:
             final_action = "매도"
         else:
             final_action = "홀드"
@@ -585,7 +659,7 @@ class AnalysisService:
         decision_summary = (
             f"최종 점수 {final_score}점으로 {final_action} 판단입니다. "
             f"추세 {trend_score}점, 모멘텀 {momentum_score}점, 거래량 {volume_score}점, 변동성 {volatility_score}점, "
-            f"시장환경 {market_context_score}점에 위험 차감 {risk_penalty}점을 반영했습니다."
+            f"시장환경은 {market_context_score:+d}점을 반영했고, 기간별 위험 차감은 {weighted_risk_penalty}점입니다."
         )
         trend_summary = self._join_reason_summary(
             trend_reasons,
@@ -656,6 +730,10 @@ class AnalysisService:
             "volatility_score": volatility_score,
             "market_context_score": market_context_score,
             "risk_penalty": risk_penalty,
+            "weighted_risk_penalty": weighted_risk_penalty,
+            "price_basis": "실시간 현재가" if live_price and live_price > 0 else "차트 마지막 종가",
+            "market_context_basis": market_context_basis,
+            "chart_basis": timeframe,
             "summary_title": summary_title,
             "summary_body": summary_body,
             "trend_outlook": trend_outlook,

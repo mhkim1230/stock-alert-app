@@ -400,6 +400,15 @@ function renderFxSelectionError(message) {
 
 function renderAnalysis(data) {
   const formatter = data.asset_type === "currency" ? formatRate : formatPrice;
+  const renderScoreDetailCard = (label, score, reasons) => `
+    <div class="stat-card score-detail-card">
+      <small>${label}</small>
+      <strong>${score}점</strong>
+      <ul class="analysis-notes compact">
+        ${((reasons || []).length ? reasons : ["현재 계산 기준에서 특이 근거는 제한적입니다."]).map((reason) => `<li>${reason}</li>`).join("")}
+      </ul>
+    </div>
+  `;
   const buySellCards = [
     renderAnalysisValueCard({
       label: "1차 매수가",
@@ -449,6 +458,11 @@ function renderAnalysis(data) {
           <strong>${data.final_score}점</strong>
         </div>
       </div>
+      <ul class="analysis-notes compact">
+        <li>현재가 기준: ${data.price_basis || "실시간 현재가"}</li>
+        <li>차트 기준: ${data.chart_basis || data.timeframe}</li>
+        <li>시장환경 기준: ${data.market_context_basis || "전일 종가 대비 현재 지수·거시 지표"}</li>
+      </ul>
     </section>
     <section class="analysis-section-card">
       <h5>${decisionTitle}</h5>
@@ -522,30 +536,12 @@ function renderAnalysis(data) {
     <details class="analysis-section-card analysis-details">
       <summary>세부 점수 보기</summary>
       <div class="analysis-grid analysis-score-grid">
-        <div class="stat-card">
-          <small>추세 점수</small>
-          <strong>${data.trend_score}점</strong>
-        </div>
-        <div class="stat-card">
-          <small>모멘텀 점수</small>
-          <strong>${data.momentum_score}점</strong>
-        </div>
-        <div class="stat-card">
-          <small>거래량 점수</small>
-          <strong>${data.volume_score}점</strong>
-        </div>
-        <div class="stat-card">
-          <small>변동성 점수</small>
-          <strong>${data.volatility_score}점</strong>
-        </div>
-        <div class="stat-card">
-          <small>시장환경 점수</small>
-          <strong>${data.market_context_score}점</strong>
-        </div>
-        <div class="stat-card">
-          <small>위험 차감</small>
-          <strong>${data.risk_penalty}점</strong>
-        </div>
+        ${renderScoreDetailCard("추세 점수", data.trend_score, data.trend_reasons)}
+        ${renderScoreDetailCard("모멘텀 점수", data.momentum_score, data.momentum_reasons)}
+        ${renderScoreDetailCard("거래량 점수", data.volume_score, data.volume_reasons)}
+        ${renderScoreDetailCard("변동성 점수", data.volatility_score, data.volatility_reasons)}
+        ${renderScoreDetailCard("시장환경 점수", data.market_context_score, [...(data.macro_reasons || []), ...(data.news_reasons || [])])}
+        ${renderScoreDetailCard("위험 차감", data.weighted_risk_penalty ?? data.risk_penalty, data.risk_reasons)}
       </div>
       <ul class="analysis-notes">
         ${(data.notes || []).map((note) => `<li>${note}</li>`).join("")}

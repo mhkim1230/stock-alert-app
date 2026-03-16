@@ -64,6 +64,7 @@ class MarketContextService:
             "market_context_summary": self._compose_summary(market_eval, news_eval, market_bias),
             "market_bias": market_bias,
             "market_scope": market_scope,
+            "market_context_basis": "전일 종가 대비 현재 지수·거시 지표",
             "news_bias": news_eval["bias"],
             "summary": self._compose_summary(market_eval, news_eval, market_bias),
             "macro_reasons": market_eval["reasons"],
@@ -122,19 +123,40 @@ class MarketContextService:
         return None
 
     async def _fetch_indicator_snapshot(self, symbol: str, label: str) -> Optional[Dict]:
-        url = (
-            "https://query1.finance.yahoo.com/v8/finance/chart/"
-            f"{symbol}?range=2d&interval=60m&includePrePost=false"
-        )
+        quote_url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbol}"
         timeout = aiohttp.ClientTimeout(total=settings.request_timeout)
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}) as response:
+                async with session.get(quote_url, headers={"User-Agent": "Mozilla/5.0"}) as response:
+                    if response.status == 200:
+                        payload = await response.json()
+                        result = (((payload or {}).get("quoteResponse") or {}).get("result") or [None])[0]
+                        if result:
+                            latest = result.get("regularMarketPrice")
+                            previous = result.get("regularMarketPreviousClose")
+                            if latest is not None and previous not in (None, 0):
+                                change_percent = ((float(latest) - float(previous)) / float(previous)) * 100
+                                return {
+                                    "symbol": symbol,
+                                    "label": label,
+                                    "price": round(float(latest), 4),
+                                    "change_percent": round(change_percent, 2),
+                                    "trend_5d": None,
+                                }
+        except Exception as exc:
+            self.logger.warning("Market context fetch failed for %s: %s", symbol, exc)
+        chart_url = (
+            "https://query1.finance.yahoo.com/v8/finance/chart/"
+            f"{symbol}?range=5d&interval=1d&includePrePost=false"
+        )
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(chart_url, headers={"User-Agent": "Mozilla/5.0"}) as response:
                     if response.status != 200:
                         return None
                     payload = await response.json()
         except Exception as exc:
-            self.logger.warning("Market context fetch failed for %s: %s", symbol, exc)
+            self.logger.warning("Market context chart fallback failed for %s: %s", symbol, exc)
             return None
 
         result = (((payload or {}).get("chart") or {}).get("result") or [None])[0]
