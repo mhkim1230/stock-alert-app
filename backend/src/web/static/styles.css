@@ -737,6 +737,7 @@ button:disabled {
 }
 
 .analysis-modal-card {
+  padding: 0;
   padding-top: 0;
   width: min(980px, 100%);
   max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
@@ -752,10 +753,8 @@ button:disabled {
   position: sticky;
   top: 0;
   z-index: 2;
-  margin: 0 -16px 10px;
-  width: calc(100% - 4px);
-  margin-left: 2px;
-  margin-right: 2px;
+  margin: 0;
+  width: 100%;
   padding: calc(env(safe-area-inset-top) + 16px) 18px 10px;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(14px);
@@ -790,7 +789,7 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 3px;
-  margin-bottom: 10px;
+  margin: 0 16px 10px;
   padding: 3px;
   border-radius: 16px;
   background: rgba(49, 130, 246, 0.08);
@@ -823,7 +822,7 @@ button:disabled {
 .analysis-body {
   display: grid;
   gap: 10px;
-  padding-top: 18px;
+  padding: 18px 16px 0;
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
@@ -1151,11 +1150,11 @@ button:disabled {
   }
 
   .modal-sticky-head {
-    margin: 0 2px 12px;
+    margin: 0;
     padding: calc(env(safe-area-inset-top) + 10px) 14px 8px;
     align-items: center;
     gap: 8px;
-    width: calc(100% - 4px);
+    width: 100%;
     max-width: 100%;
   }
 
@@ -1177,7 +1176,7 @@ button:disabled {
   .analysis-range-switch {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     top: calc(env(safe-area-inset-top) + 84px);
-    margin-top: 6px;
+    margin: 6px 12px 10px;
     gap: 3px;
     padding: 3px;
   }
@@ -1189,8 +1188,7 @@ button:disabled {
   }
 
   .analysis-body {
-    padding-top: 22px;
-    padding-inline: 0;
+    padding: 22px 12px 0;
   }
 
   .modal-sticky-head .eyebrow {
