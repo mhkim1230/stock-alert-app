@@ -645,42 +645,98 @@ class NaverStockService:
             text = " ".join(info.get_text(" ", strip=True).split()) if info else ""
             if not text:
                 return None
-
-            # 네이버 상세 페이지에는 정규장 블록 뒤에 보합 0.00% 보조 블록이
-            # 함께 붙는 경우가 있어서, 실제 시세가 담긴 첫 블록만 사용합니다.
-            today_marker = "오늘의시세"
-            first_today_index = text.find(today_marker)
-            second_today_index = text.find(today_marker, first_today_index + len(today_marker)) if first_today_index >= 0 else -1
-            active_text = text[:second_today_index].strip() if second_today_index > 0 else text
-
-            current_match = re.search(r"현재가\s*([0-9,]+)", active_text)
-            prev_match = re.search(r"전일가\s*([0-9,]+)", active_text)
-            volume_match = re.search(r"거래량\s*([0-9,]+)", active_text)
-
-            if not current_match or not prev_match:
+            candidates = self._extract_domestic_market_candidates(text)
+            if not candidates:
                 return None
-
-            current_price = float(current_match.group(1).replace(",", ""))
-            previous_close = float(prev_match.group(1).replace(",", ""))
-            volume = int(volume_match.group(1).replace(",", "")) if volume_match else 0
-            if previous_close <= 0:
-                return None
-
-            change_percent = round(((current_price - previous_close) / previous_close) * 100, 2)
-            if "전일대비 하락" in active_text and change_percent > 0:
-                change_percent *= -1
-            if "전일대비 보합" in active_text and "전일대비 상승" not in active_text and "전일대비 하락" not in active_text:
-                change_percent = 0.0
-
+            best = sorted(
+                candidates,
+                key=lambda item: (
+                    item["score"],
+                    item["volume"],
+                    abs(item["change_percent"]),
+                    item["current_price"],
+                ),
+                reverse=True,
+            )[0]
             return {
-                "current_price": current_price,
-                "previous_close": previous_close,
-                "change_percent": change_percent,
-                "volume": float(volume),
+                "current_price": best["current_price"],
+                "previous_close": best["previous_close"],
+                "change_percent": best["change_percent"],
+                "volume": float(best["volume"]),
             }
         except Exception as e:
             self.logger.error(f"❌ 국내 시세 스냅샷 추출 오류: {e}")
             return None
+
+    def _extract_domestic_market_candidates(self, text: str) -> List[Dict[str, float]]:
+        candidates: List[Dict[str, float]] = []
+        if "오늘의시세" in text:
+            parts = text.split("오늘의시세")
+            segments = [segment.strip() for segment in parts[1:] if segment.strip()]
+        else:
+            segments = [text]
+
+        for segment in segments:
+            candidate = self._parse_domestic_market_segment(segment)
+            if candidate:
+                candidates.append(candidate)
+
+        # fallback: 오늘의시세 분리가 실패한 페이지에서만 전체 텍스트를 후보로 사용
+        if not candidates:
+            summary_candidate = self._parse_domestic_market_segment(text)
+            if summary_candidate:
+                candidates.append(summary_candidate)
+
+        return candidates
+
+    def _parse_domestic_market_segment(self, segment: str) -> Optional[Dict[str, float]]:
+        if re.match(r"[0-9,]+", segment):
+            current_match = re.match(r"([0-9,]+)", segment)
+        else:
+            current_match = re.search(r"(?:현재가|오늘의시세)\s*([0-9,]+)", segment)
+        prev_match = re.search(r"(?:전일가|주요 시세 전일|전일)\s*([0-9,]+)", segment)
+        volume_match = re.search(r"거래량\s*([0-9,]+)", segment)
+        high_match = re.search(r"고가\s*([0-9,]+)", segment)
+        low_match = re.search(r"저가\s*([0-9,]+)", segment)
+
+        if not current_match or not prev_match:
+            return None
+
+        current_price = float(current_match.group(1).replace(",", ""))
+        previous_close = float(prev_match.group(1).replace(",", ""))
+        if previous_close <= 0:
+            return None
+
+        volume = int(volume_match.group(1).replace(",", "")) if volume_match else 0
+        high_price = float(high_match.group(1).replace(",", "")) if high_match else 0.0
+        low_price = float(low_match.group(1).replace(",", "")) if low_match else 0.0
+        change_percent = round(((current_price - previous_close) / previous_close) * 100, 2)
+
+        if "전일대비 하락" in segment and change_percent > 0:
+            change_percent *= -1
+        if "전일대비 상승" in segment and change_percent < 0:
+            change_percent *= -1
+        if "전일대비 보합" in segment and "전일대비 상승" not in segment and "전일대비 하락" not in segment:
+            change_percent = 0.0
+
+        score = 0
+        if volume > 0:
+            score += 40
+        if high_price > 0 or low_price > 0:
+            score += 20
+        if "상승" in segment or "하락" in segment:
+            score += 15
+        if "보합 0.00%" in segment and volume == 0:
+            score -= 60
+        if current_price != previous_close:
+            score += 10
+        return {
+            "current_price": current_price,
+            "previous_close": previous_close,
+            "change_percent": change_percent,
+            "volume": float(volume),
+            "score": float(score),
+        }
 
     def _extract_stock_name(self, soup: BeautifulSoup, code: str) -> Optional[str]:
         """HTML에서 정확한 종목명 추출"""
