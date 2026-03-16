@@ -10,7 +10,7 @@ from src.services.news_service import NewsService
 
 
 class MarketContextService:
-    MARKET_SYMBOLS = {
+    GLOBAL_MARKET_SYMBOLS = {
         "sp500": {"label": "S&P500", "candidates": ["^GSPC"]},
         "nasdaq": {"label": "나스닥", "candidates": ["^IXIC"]},
         "dow": {"label": "다우", "candidates": ["^DJI"]},
@@ -19,6 +19,14 @@ class MarketContextService:
         "dxy": {"label": "달러지수", "candidates": ["DX-Y.NYB", "DX=F"]},
         "oil": {"label": "WTI", "candidates": ["CL=F"]},
         "gold": {"label": "금", "candidates": ["GC=F"]},
+    }
+    DOMESTIC_MARKET_SYMBOLS = {
+        "kospi": {"label": "코스피", "candidates": ["^KS11"]},
+        "kosdaq": {"label": "코스닥", "candidates": ["^KQ11"]},
+        "usdkrw": {"label": "USD/KRW", "candidates": ["KRW=X"]},
+        "oil": {"label": "WTI", "candidates": ["CL=F"]},
+        "gold": {"label": "금", "candidates": ["GC=F"]},
+        "vix": {"label": "VIX", "candidates": ["^VIX"]},
     }
 
     TOPIC_GROUPS = {
@@ -38,10 +46,10 @@ class MarketContextService:
         self.logger = logging.getLogger(__name__)
         self.news_service = news_service or NewsService()
 
-    async def build_context(self, asset_type: str, symbol: str, name: str) -> Dict:
-        related_articles, macro_articles, indicators = await self._collect_inputs(symbol, name)
+    async def build_context(self, asset_type: str, symbol: str, name: str, market_scope: str = "global") -> Dict:
+        related_articles, macro_articles, indicators = await self._collect_inputs(symbol, name, market_scope)
         news_eval = self._evaluate_news(asset_type, related_articles, macro_articles)
-        market_eval = self._evaluate_indicators(asset_type, symbol, indicators)
+        market_eval = self._evaluate_indicators(asset_type, symbol, indicators, market_scope)
 
         market_context_score = max(-10, min(10, news_eval["delta"] + market_eval["delta"]))
         if market_context_score >= 3:
@@ -55,6 +63,7 @@ class MarketContextService:
             "market_context_score": market_context_score,
             "market_context_summary": self._compose_summary(market_eval, news_eval, market_bias),
             "market_bias": market_bias,
+            "market_scope": market_scope,
             "news_bias": news_eval["bias"],
             "summary": self._compose_summary(market_eval, news_eval, market_bias),
             "macro_reasons": market_eval["reasons"],
@@ -65,7 +74,7 @@ class MarketContextService:
             "macro_articles": macro_articles,
         }
 
-    async def _collect_inputs(self, symbol: str, name: str) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], Dict[str, Dict]]:
+    async def _collect_inputs(self, symbol: str, name: str, market_scope: str) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], Dict[str, Dict]]:
         queries = [symbol]
         if name and name.lower() != symbol.lower():
             queries.append(name)
@@ -88,14 +97,15 @@ class MarketContextService:
 
         macro_articles, indicators = await asyncio.gather(
             self.news_service.get_latest_news(limit=10),
-            self._fetch_market_indicators(),
+            self._fetch_market_indicators(market_scope),
         )
         return related_articles[:4], macro_articles[:10], indicators
 
-    async def _fetch_market_indicators(self) -> Dict[str, Dict]:
+    async def _fetch_market_indicators(self, market_scope: str) -> Dict[str, Dict]:
+        symbol_map = self.DOMESTIC_MARKET_SYMBOLS if market_scope == "domestic" else self.GLOBAL_MARKET_SYMBOLS
         tasks = {
             key: asyncio.create_task(self._fetch_indicator_with_fallback(config["candidates"], config["label"]))
-            for key, config in self.MARKET_SYMBOLS.items()
+            for key, config in symbol_map.items()
         }
         results: Dict[str, Dict] = {}
         for key, task in tasks.items():
@@ -212,39 +222,87 @@ class MarketContextService:
             "themes": [label for label, _ in sorted_topics[:3]],
         }
 
-    def _evaluate_indicators(self, asset_type: str, symbol: str, indicators: Dict[str, Dict]) -> Dict:
+    def _evaluate_indicators(self, asset_type: str, symbol: str, indicators: Dict[str, Dict], market_scope: str) -> Dict:
         delta = 0
         reasons: List[str] = []
 
-        sp500 = indicators.get("sp500")
-        nasdaq = indicators.get("nasdaq")
         vix = indicators.get("vix")
-        tnx = indicators.get("tnx")
-        dxy = indicators.get("dxy")
         oil = indicators.get("oil")
         gold = indicators.get("gold")
 
-        if sp500 and nasdaq:
-            if sp500["change_percent"] > 0 and nasdaq["change_percent"] > 0:
-                delta += 2
-                reasons.append(
-                    f"미국 주요 지수는 S&P500 {sp500['change_percent']:+.2f}%, 나스닥 {nasdaq['change_percent']:+.2f}%로 위험선호 흐름입니다."
-                )
-            elif sp500["change_percent"] < 0 and nasdaq["change_percent"] < 0:
-                delta -= 2
-                reasons.append(
-                    f"미국 주요 지수는 S&P500 {sp500['change_percent']:+.2f}%, 나스닥 {nasdaq['change_percent']:+.2f}%로 전반적으로 약세입니다."
-                )
+        if asset_type == "stock" and market_scope == "domestic":
+            kospi = indicators.get("kospi")
+            kosdaq = indicators.get("kosdaq")
+            usdkrw = indicators.get("usdkrw")
 
-        if vix:
-            if vix["change_percent"] >= 5:
-                delta -= 2
-                reasons.append(f"VIX가 {vix['change_percent']:+.2f}% 움직여 변동성 경계 심리가 강해졌습니다.")
-            elif vix["change_percent"] <= -5:
-                delta += 1
-                reasons.append(f"VIX가 {vix['change_percent']:+.2f}% 내려 위험회피 심리가 완화되고 있습니다.")
+            if kospi and kosdaq:
+                if kospi["change_percent"] > 0 and kosdaq["change_percent"] > 0:
+                    delta += 2
+                    reasons.append(
+                        f"국내 주요 지수는 코스피 {kospi['change_percent']:+.2f}%, 코스닥 {kosdaq['change_percent']:+.2f}%로 전반적인 투자심리가 우호적입니다."
+                    )
+                elif kospi["change_percent"] < 0 and kosdaq["change_percent"] < 0:
+                    delta -= 2
+                    reasons.append(
+                        f"국내 주요 지수는 코스피 {kospi['change_percent']:+.2f}%, 코스닥 {kosdaq['change_percent']:+.2f}%로 전반적으로 약세입니다."
+                    )
+            elif kospi:
+                if kospi["change_percent"] > 0:
+                    delta += 1
+                    reasons.append(f"코스피가 {kospi['change_percent']:+.2f}% 올라 국내 시장 흐름은 비교적 우호적입니다.")
+                elif kospi["change_percent"] < 0:
+                    delta -= 1
+                    reasons.append(f"코스피가 {kospi['change_percent']:+.2f}% 내려 국내 시장 압력이 이어지고 있습니다.")
 
-        if asset_type == "stock":
+            if usdkrw:
+                if usdkrw["change_percent"] >= 0.4:
+                    delta -= 2
+                    reasons.append(f"원달러 환율이 {usdkrw['change_percent']:+.2f}% 올라 외국인 수급에는 부담이 될 수 있습니다.")
+                elif usdkrw["change_percent"] <= -0.4:
+                    delta += 2
+                    reasons.append(f"원달러 환율이 {usdkrw['change_percent']:+.2f}% 내려 국내 위험자산 선호에는 우호적입니다.")
+
+            if oil:
+                if oil["change_percent"] >= 2:
+                    delta -= 1
+                    reasons.append(f"유가가 {oil['change_percent']:+.2f}% 올라 국내 비용 부담과 물가 우려가 커질 수 있습니다.")
+                elif oil["change_percent"] <= -2:
+                    delta += 1
+                    reasons.append(f"유가가 {oil['change_percent']:+.2f}% 내려 국내 비용 부담은 다소 완화되고 있습니다.")
+
+            if vix:
+                if vix["change_percent"] >= 5:
+                    delta -= 1
+                    reasons.append(f"VIX가 {vix['change_percent']:+.2f}% 올라 글로벌 변동성 경계 심리가 높아졌습니다.")
+                elif vix["change_percent"] <= -5:
+                    delta += 1
+                    reasons.append(f"VIX가 {vix['change_percent']:+.2f}% 내려 글로벌 위험회피 심리는 완화되고 있습니다.")
+        elif asset_type == "stock":
+            sp500 = indicators.get("sp500")
+            nasdaq = indicators.get("nasdaq")
+            tnx = indicators.get("tnx")
+            dxy = indicators.get("dxy")
+
+            if sp500 and nasdaq:
+                if sp500["change_percent"] > 0 and nasdaq["change_percent"] > 0:
+                    delta += 2
+                    reasons.append(
+                        f"미국 주요 지수는 S&P500 {sp500['change_percent']:+.2f}%, 나스닥 {nasdaq['change_percent']:+.2f}%로 위험선호 흐름입니다."
+                    )
+                elif sp500["change_percent"] < 0 and nasdaq["change_percent"] < 0:
+                    delta -= 2
+                    reasons.append(
+                        f"미국 주요 지수는 S&P500 {sp500['change_percent']:+.2f}%, 나스닥 {nasdaq['change_percent']:+.2f}%로 전반적으로 약세입니다."
+                    )
+
+            if vix:
+                if vix["change_percent"] >= 5:
+                    delta -= 2
+                    reasons.append(f"VIX가 {vix['change_percent']:+.2f}% 움직여 변동성 경계 심리가 강해졌습니다.")
+                elif vix["change_percent"] <= -5:
+                    delta += 1
+                    reasons.append(f"VIX가 {vix['change_percent']:+.2f}% 내려 위험회피 심리가 완화되고 있습니다.")
+
             if tnx:
                 if tnx["change_percent"] >= 1:
                     delta -= 1
@@ -269,6 +327,8 @@ class MarketContextService:
                     delta += 1
                     reasons.append(f"유가가 {oil['change_percent']:+.2f}% 내려 비용 부담은 다소 완화되고 있습니다.")
         else:
+            dxy = indicators.get("dxy")
+            tnx = indicators.get("tnx")
             base, _, target = symbol.partition("/")
             if dxy and ("USD" in {base, target}):
                 if base == "USD":
@@ -317,7 +377,7 @@ class MarketContextService:
     @staticmethod
     def _compose_market_snapshot(indicators: Dict[str, Dict]) -> str:
         ordered = []
-        for key in ("sp500", "nasdaq", "vix", "tnx", "dxy", "oil"):
+        for key in ("kospi", "kosdaq", "usdkrw", "sp500", "nasdaq", "vix", "tnx", "dxy", "oil"):
             payload = indicators.get(key)
             if not payload:
                 continue

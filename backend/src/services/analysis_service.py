@@ -38,12 +38,15 @@ class AnalysisService:
             return None
         if symbol.isdigit():
             investor_flow = await self._fetch_investor_flow(symbol)
+            market_scope = "domestic"
         else:
             investor_flow = self._build_global_flow(raw_history if raw_history else history)
+            market_scope = "global"
         news_context = await self.market_context_service.build_context(
             asset_type="stock",
             symbol=symbol.upper(),
             name=stock_name,
+            market_scope=market_scope,
         )
         return self._build_analysis(
             history=history,
