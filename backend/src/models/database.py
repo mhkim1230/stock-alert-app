@@ -61,6 +61,25 @@ class WatchlistItem(Base, TimestampMixin):
     symbol: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
 
 
+class StockQuoteSnapshot(Base):
+    __tablename__ = "stock_quote_snapshots"
+
+    symbol: Mapped[str] = mapped_column(String(20), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    market: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    change: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    change_percent: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="KRW")
+    source: Mapped[str] = mapped_column(String(80), nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class FxWatchlistItem(Base, TimestampMixin):
     __tablename__ = "fx_watchlist_items"
 

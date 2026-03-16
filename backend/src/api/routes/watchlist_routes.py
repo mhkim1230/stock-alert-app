@@ -9,11 +9,15 @@ from src.models.database import FxWatchlistItem, WatchlistItem
 from src.schemas.api import (
     FxWatchlistItemCreate,
     FxWatchlistItemResponse,
+    StockQuoteSnapshotResponse,
     WatchlistItemCreate,
     WatchlistItemResponse,
+    WatchlistQuotesRefreshRequest,
 )
+from src.services.watchlist_quote_service import WatchlistQuoteService
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
+watchlist_quote_service = WatchlistQuoteService()
 
 
 @router.get("", response_model=List[WatchlistItemResponse])
@@ -35,6 +39,11 @@ async def list_fx_watchlist(db: AsyncSession = Depends(get_protected_db)):
         ).scalars()
     )
     return items
+
+
+@router.get("/quotes", response_model=List[StockQuoteSnapshotResponse])
+async def list_watchlist_quotes(db: AsyncSession = Depends(get_protected_db)):
+    return await watchlist_quote_service.list_snapshots(db)
 
 
 @router.post("", response_model=WatchlistItemResponse, status_code=status.HTTP_201_CREATED)
@@ -74,6 +83,13 @@ async def create_fx_watchlist_item(
     return item
 
 
+@router.post("/quotes/refresh", response_model=List[StockQuoteSnapshotResponse])
+async def refresh_watchlist_quotes(
+    payload: WatchlistQuotesRefreshRequest, db: AsyncSession = Depends(get_protected_db)
+):
+    return await watchlist_quote_service.refresh_snapshots(db, payload.symbols)
+
+
 @router.delete("/fx/{base_currency}/{target_currency}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_fx_watchlist_item(
     base_currency: str, target_currency: str, db: AsyncSession = Depends(get_protected_db)
@@ -99,3 +115,4 @@ async def delete_watchlist_item(symbol: str, db: AsyncSession = Depends(get_prot
         raise HTTPException(status_code=404, detail="Watchlist symbol not found")
     await db.delete(item)
     await db.commit()
+    await watchlist_quote_service.delete_snapshot(db, symbol.upper())

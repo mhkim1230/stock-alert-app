@@ -678,25 +678,24 @@ function renderAll() {
 }
 
 async function refreshStockQuotes() {
-  const quotes = await Promise.all(
-    state.watchlist.map(async (item) => {
-      try {
-        const quote = await request(`/stocks/${item.symbol}`, {
-          skipLoading: true,
-        });
-        return [item.symbol, quote];
-      } catch {
-        return [item.symbol, null];
-      }
-    })
+  const quotes = await request("/watchlist/quotes", {
+    skipLoading: true,
+  });
+  state.stockQuotes = Object.fromEntries(
+    quotes.map((quote) => [String(quote.symbol).toUpperCase(), quote])
   );
-  state.stockQuotes = Object.fromEntries(quotes);
 }
 
 async function refreshSingleStockQuote(symbol) {
-  const quote = await request(`/stocks/${encodeURIComponent(symbol)}`, {
+  const quotes = await request("/watchlist/quotes/refresh", {
+    method: "POST",
+    body: JSON.stringify({ symbols: [symbol] }),
     skipLoading: true,
   });
+  const quote = quotes.find((item) => String(item.symbol).toUpperCase() === String(symbol).toUpperCase()) || null;
+  if (!quote) {
+    throw new Error("시세를 갱신하지 못했습니다.");
+  }
   state.stockQuotes[symbol] = quote;
   return quote;
 }
@@ -1080,10 +1079,12 @@ async function handleListActions(event) {
     }
     if (action === "refresh-stock-quote") {
       await withButtonBusy(trigger, "갱신 중...", async () => {
-        const quote = await request(`/stocks/${encodeURIComponent(trigger.dataset.symbol)}`, {
+        const quote = await request("/watchlist/quotes/refresh", {
+          method: "POST",
+          body: JSON.stringify({ symbols: [trigger.dataset.symbol] }),
           loadingMessage: "현재가를 다시 불러오는 중입니다...",
         });
-        state.stockQuotes[trigger.dataset.symbol] = quote;
+        state.stockQuotes[trigger.dataset.symbol] = quote[0] || null;
       });
       renderStockWatchlist();
       showToast("현재가를 갱신했습니다.", "success");
@@ -1228,7 +1229,14 @@ elements.refreshWatchlistButton?.addEventListener("click", async () => {
   elements.refreshWatchlistButton.classList.add("is-busy");
   elements.refreshWatchlistButton.setAttribute("aria-busy", "true");
   try {
-    await refreshStockQuotes();
+    const quotes = await request("/watchlist/quotes/refresh", {
+      method: "POST",
+      body: JSON.stringify({ symbols: state.watchlist.map((item) => item.symbol) }),
+      loadingMessage: "관심종목 시세를 갱신하는 중입니다...",
+    });
+    state.stockQuotes = Object.fromEntries(
+      quotes.map((quote) => [String(quote.symbol).toUpperCase(), quote])
+    );
   } finally {
     elements.refreshWatchlistButton.disabled = false;
     elements.refreshWatchlistButton.classList.remove("is-busy");
