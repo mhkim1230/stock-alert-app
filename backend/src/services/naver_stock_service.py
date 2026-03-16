@@ -606,14 +606,16 @@ class NaverStockService:
                 self.logger.warning(f"❌ 종목명을 찾을 수 없음: {code}")
                 return None
             
+            snapshot = self._extract_domestic_market_snapshot(soup)
+
             # 현재가 추출
-            current_price = self._extract_current_price(soup)
+            current_price = snapshot["current_price"] if snapshot else self._extract_current_price(soup)
             if not current_price:
                 self.logger.warning(f"❌ 현재가를 찾을 수 없음: {code}")
                 return None
             
             # 변동률 추출
-            change_percent = self._extract_change_percent(soup)
+            change_percent = snapshot["change_percent"] if snapshot else self._extract_change_percent(soup)
             
             # 시장 구분 (코스피/코스닥 판단 - 간단한 로직)
             market = self._determine_market(soup, code)
@@ -634,6 +636,43 @@ class NaverStockService:
             
         except Exception as e:
             self.logger.error(f"❌ 종목코드 조회 실패 ({code}): {e}")
+            return None
+
+    def _extract_domestic_market_snapshot(self, soup: BeautifulSoup) -> Optional[Dict[str, float]]:
+        """국내 주식 현재가/전일가/등락률을 같은 시점 블록에서 추출"""
+        try:
+            info = soup.select_one(".new_totalinfo")
+            text = " ".join(info.get_text(" ", strip=True).split()) if info else ""
+            if not text:
+                return None
+
+            current_match = re.search(r"현재가\s*([0-9,]+)", text)
+            prev_match = re.search(r"전일가\s*([0-9,]+)", text)
+            volume_match = re.search(r"거래량\s*([0-9,]+)", text)
+
+            if not current_match or not prev_match:
+                return None
+
+            current_price = float(current_match.group(1).replace(",", ""))
+            previous_close = float(prev_match.group(1).replace(",", ""))
+            volume = int(volume_match.group(1).replace(",", "")) if volume_match else 0
+            if previous_close <= 0:
+                return None
+
+            change_percent = round(((current_price - previous_close) / previous_close) * 100, 2)
+            if "전일대비 하락" in text and change_percent > 0:
+                change_percent *= -1
+            if "전일대비 보합" in text:
+                change_percent = 0.0
+
+            return {
+                "current_price": current_price,
+                "previous_close": previous_close,
+                "change_percent": change_percent,
+                "volume": float(volume),
+            }
+        except Exception as e:
+            self.logger.error(f"❌ 국내 시세 스냅샷 추출 오류: {e}")
             return None
 
     def _extract_stock_name(self, soup: BeautifulSoup, code: str) -> Optional[str]:

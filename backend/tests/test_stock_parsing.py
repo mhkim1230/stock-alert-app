@@ -51,3 +51,23 @@ def test_extract_change_percent_keeps_real_zero_when_only_flat_value_exists():
 
     service = NaverStockService()
     assert service._extract_change_percent(soup) == 0.0
+
+
+def test_extract_domestic_market_snapshot_keeps_price_and_change_in_same_block():
+    html = """
+    <div class="new_totalinfo">
+      종목 시세 정보 2026년 03월 16일 09시 21분 기준 장중
+      종목명 SK하이닉스 종목코드 000660
+      현재가 941,000 전일대비 상승 31,000 플러스 3.41 퍼센트
+      전일가 910,000 시가 925,000 고가 945,000 저가 924,000 거래량 735,601
+    </div>
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    service = NaverStockService()
+    snapshot = service._extract_domestic_market_snapshot(soup)
+
+    assert snapshot is not None
+    assert snapshot["current_price"] == 941000.0
+    assert snapshot["previous_close"] == 910000.0
+    assert snapshot["change_percent"] == 3.41
