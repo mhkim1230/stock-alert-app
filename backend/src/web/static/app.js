@@ -201,6 +201,7 @@ function showLoadingCard(target, message) {
 
 function showToast(message, kind = "info") {
   const root = document.getElementById("toast-root");
+  root.innerHTML = "";
   const toast = document.createElement("div");
   toast.className = `toast ${kind}`;
   toast.textContent = message;
@@ -689,6 +690,14 @@ async function refreshStockQuotes() {
   state.stockQuotes = Object.fromEntries(quotes);
 }
 
+async function refreshSingleStockQuote(symbol) {
+  const quote = await request(`/stocks/${encodeURIComponent(symbol)}`, {
+    skipLoading: true,
+  });
+  state.stockQuotes[symbol] = quote;
+  return quote;
+}
+
 async function refreshFxRates() {
   const rates = await Promise.all(
     state.fxWatchlist.map(async (pair) => {
@@ -740,6 +749,11 @@ function showLoggedOut() {
   elements.logoutButton.classList.add("hidden");
   closeStockSearchModal();
   closeAnalysisModal();
+}
+
+function resetStockSearchModalState() {
+  elements.stockSearchQuery.value = "";
+  elements.stockSearchResults.innerHTML = `<li class="empty-state">검색어를 입력해 주세요.</li>`;
 }
 
 async function bootstrap() {
@@ -795,6 +809,7 @@ async function handleLogout() {
 }
 
 function openStockSearchModal(query = "") {
+  resetStockSearchModalState();
   elements.stockSearchModal.classList.remove("hidden");
   if (query) {
     elements.stockSearchQuery.value = query;
@@ -803,6 +818,7 @@ function openStockSearchModal(query = "") {
 }
 
 function closeStockSearchModal() {
+  resetStockSearchModalState();
   elements.stockSearchModal.classList.add("hidden");
 }
 
@@ -1076,15 +1092,28 @@ async function handleListActions(event) {
     }
     if (action === "add-watchlist-symbol") {
       await withButtonBusy(trigger, "추가 중...", async () => {
-        await request("/watchlist", {
+        const created = await request("/watchlist", {
           method: "POST",
           body: JSON.stringify({ symbol: trigger.dataset.symbol }),
           loadingMessage: "관심종목에 추가하는 중입니다...",
         });
+        const symbol = String(created.symbol || trigger.dataset.symbol).toUpperCase();
+        const exists = state.watchlist.some((item) => String(item.symbol).toUpperCase() === symbol);
+        if (!exists) {
+          state.watchlist = [...state.watchlist, created].sort((left, right) =>
+            String(left.symbol).localeCompare(String(right.symbol), "ko-KR")
+          );
+        }
+        renderStockWatchlist();
+        setView("watchlist");
+        closeStockSearchModal();
+        try {
+          await refreshSingleStockQuote(symbol);
+        } catch {
+          state.stockQuotes[symbol] = null;
+        }
       });
-      closeStockSearchModal();
-      setView("watchlist");
-      await refreshData();
+      renderStockWatchlist();
       showToast("관심종목을 추가했습니다.", "success");
       return;
     }
@@ -1095,7 +1124,12 @@ async function handleListActions(event) {
           loadingMessage: "관심종목을 삭제하는 중입니다...",
         });
       });
-      await refreshData();
+      {
+        const symbol = String(trigger.dataset.symbol || "").toUpperCase();
+        state.watchlist = state.watchlist.filter((item) => String(item.symbol).toUpperCase() !== symbol);
+        delete state.stockQuotes[symbol];
+      }
+      renderStockWatchlist();
       showToast("관심종목을 삭제했습니다.", "info");
       return;
     }
@@ -1187,11 +1221,18 @@ elements.fxTargetSelect.addEventListener("blur", handleFxSelectionChange);
 elements.loginForm.addEventListener("submit", handleLogin);
 elements.logoutButton.addEventListener("click", handleLogout);
 elements.refreshWatchlistButton?.addEventListener("click", async () => {
-  await withButtonBusy(elements.refreshWatchlistButton, "갱신 중...", async () => {
+  elements.refreshWatchlistButton.disabled = true;
+  elements.refreshWatchlistButton.classList.add("is-busy");
+  elements.refreshWatchlistButton.setAttribute("aria-busy", "true");
+  try {
     await refreshStockQuotes();
-  });
+  } finally {
+    elements.refreshWatchlistButton.disabled = false;
+    elements.refreshWatchlistButton.classList.remove("is-busy");
+    elements.refreshWatchlistButton.removeAttribute("aria-busy");
+  }
   renderStockWatchlist();
-  showToast("관심종목 현재가를 갱신했습니다.", "success");
+  showToast("관심종목 시세를 갱신했습니다.", "success");
 });
 elements.refreshDashboard.addEventListener("click", async () => {
   await withButtonBusy(elements.refreshDashboard, "새로고침 중...", async () => {
