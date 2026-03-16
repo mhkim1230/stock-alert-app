@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 from statistics import mean, pstdev
 from typing import Dict, List, Optional, Tuple
@@ -37,10 +38,13 @@ class AnalysisService:
         if not history:
             return None
         if symbol.isdigit():
-            investor_flow = await self._fetch_investor_flow(symbol)
+            if (period or "").lower() == "intraday":
+                investor_flow = await self._fetch_intraday_live_flow(symbol)
+            else:
+                investor_flow = None
             market_scope = "domestic"
         else:
-            investor_flow = self._build_global_flow(raw_history if raw_history else history)
+            investor_flow = None
             market_scope = "global"
         news_context = await self.market_context_service.build_context(
             asset_type="stock",
@@ -368,6 +372,116 @@ class AnalysisService:
             "summary": f"최근 5거래일 외국인 {direction(foreign_5d)}, 기관 {direction(institution_5d)}",
         }
 
+    async def _fetch_intraday_live_flow(self, symbol: str) -> Optional[Dict]:
+        url = f"https://finance.naver.com/item/frgn.naver?code={symbol}"
+        timeout = aiohttp.ClientTimeout(total=settings.request_timeout)
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}) as response:
+                    if response.status != 200:
+                        return {
+                            "market_scope": "domestic",
+                            "flow_mode": "excluded",
+                            "flow_basis": "무료 실시간 수급 페이지 접근 실패로 이번 판단에서 제외했습니다.",
+                        }
+                    html = await response.text()
+        except Exception as exc:
+            self.logger.warning("Intraday live flow fetch failed for %s: %s", symbol, exc)
+            return {
+                "market_scope": "domestic",
+                "flow_mode": "excluded",
+                "flow_basis": "무료 실시간 수급 수집 오류로 이번 판단에서 제외했습니다.",
+            }
+
+        soup = BeautifulSoup(html, "html.parser")
+        blind = soup.select_one("dl.blind")
+        blind_text = blind.get_text(" ", strip=True) if blind else ""
+        if "장중" not in blind_text:
+            return {
+                "market_scope": "domestic",
+                "flow_mode": "excluded",
+                "flow_basis": "장중 실시간 수급이 아닌 데이터라 이번 판단에서 제외했습니다.",
+            }
+
+        trade_table = None
+        for table in soup.select("table.type2"):
+            caption = table.find("caption")
+            if caption and "거래원정보" in caption.get_text(" ", strip=True):
+                trade_table = table
+                break
+        if trade_table is None:
+            return {
+                "market_scope": "domestic",
+                "flow_mode": "excluded",
+                "flow_basis": "실시간 수급 표를 찾지 못해 이번 판단에서 제외했습니다.",
+            }
+
+        top_buy = 0
+        top_sell = 0
+        estimated_sell = None
+        estimated_buy = None
+        estimated_net = None
+
+        for tr in trade_table.select("tr"):
+            cols = [col.get_text(" ", strip=True) for col in tr.find_all(["th", "td"])]
+            if len(cols) == 4 and cols[0] and cols[0] not in {"매도상위", "외국계추정합"}:
+                sell_value = self._parse_numeric_value(cols[1])
+                buy_value = self._parse_numeric_value(cols[3])
+                if sell_value is not None:
+                    top_sell += int(sell_value)
+                if buy_value is not None:
+                    top_buy += int(buy_value)
+            elif len(cols) == 4 and cols[0] == "외국계추정합":
+                estimated_sell = self._parse_numeric_value(cols[1])
+                estimated_net = self._parse_numeric_value(cols[2])
+                estimated_buy = self._parse_numeric_value(cols[3])
+
+        if estimated_sell is None or estimated_buy is None or estimated_net is None:
+            return {
+                "market_scope": "domestic",
+                "flow_mode": "excluded",
+                "flow_basis": "외국계추정합 수치를 확인할 수 없어 이번 판단에서 제외했습니다.",
+            }
+
+        inferred_net = float(estimated_buy) - float(estimated_sell)
+        if abs(inferred_net - float(estimated_net)) > max(1000.0, abs(inferred_net) * 0.1):
+            return {
+                "market_scope": "domestic",
+                "flow_mode": "excluded",
+                "flow_basis": "실시간 수급 수치가 서로 맞지 않아 이번 판단에서 제외했습니다.",
+            }
+
+        ratio = float(estimated_buy) / float(estimated_sell) if float(estimated_sell) > 0 else None
+        if inferred_net > 0:
+            direction = "순매수"
+        elif inferred_net < 0:
+            direction = "순매도"
+        else:
+            direction = "중립"
+
+        time_match = re.search(r"(\d{1,2}시\s*\d{2}분)\s*기준\s*장중", blind_text)
+        latest_time = re.sub(r"\s+", "", time_match.group(1)) if time_match else "장중"
+        summary = (
+            f"{latest_time} 기준 외국계추정 {direction} {abs(int(round(inferred_net))):,}주"
+            f"{f', 매수/매도 비율 {ratio:.2f}배' if ratio is not None else ''} 흐름입니다."
+        )
+
+        return {
+            "market_scope": "domestic",
+            "flow_mode": "live",
+            "flow_type": "foreign_estimated_intraday",
+            "flow_basis": "거래원정보의 외국계추정합을 이용한 장중 무료 실시간 수급 추정치입니다.",
+            "latest_time": latest_time,
+            "foreign_estimated_sell": int(round(float(estimated_sell))),
+            "foreign_estimated_buy": int(round(float(estimated_buy))),
+            "foreign_estimated_net": int(round(float(inferred_net))),
+            "top_sell_5_sum": top_sell,
+            "top_buy_5_sum": top_buy,
+            "flow_ratio": round(ratio, 2) if ratio is not None else None,
+            "foreign_direction": direction,
+            "summary": summary,
+        }
+
     def _build_global_flow(self, history: List[Dict[str, float]]) -> Optional[Dict]:
         if len(history) < 25:
             return None
@@ -599,6 +713,8 @@ class AnalysisService:
         market_context_basis = str(news_context.get("market_context_basis") or "전일 종가 대비 현재 지수·거시 지표")
         macro_reasons = list(news_context.get("macro_reasons") or [])
         news_reasons = list(news_context.get("news_reasons") or [])
+        flow_mode = investor_flow.get("flow_mode") if investor_flow else None
+        flow_basis = investor_flow.get("flow_basis") if investor_flow else None
 
         positive_market_bonus = round(max(0, market_context_score) * score_profile["positive_market_multiplier"])
         negative_market_penalty = round(abs(min(0, market_context_score)) * score_profile["negative_market_multiplier"])
@@ -734,6 +850,8 @@ class AnalysisService:
             "price_basis": "실시간 현재가" if live_price and live_price > 0 else "차트 마지막 종가",
             "market_context_basis": market_context_basis,
             "chart_basis": timeframe,
+            "flow_mode": flow_mode,
+            "flow_basis": flow_basis,
             "summary_title": summary_title,
             "summary_body": summary_body,
             "trend_outlook": trend_outlook,
@@ -843,8 +961,12 @@ class AnalysisService:
                 score -= 3
 
         if investor_flow:
-            if investor_flow.get("market_scope") == "domestic" and investor_flow["foreign_direction"] == investor_flow["institution_direction"] != "중립":
-                score += 5
+            if investor_flow.get("market_scope") == "domestic" and investor_flow.get("flow_mode") == "live":
+                ratio = investor_flow.get("flow_ratio")
+                if investor_flow.get("foreign_direction") == "순매수" and ratio is not None and ratio >= 1.05:
+                    score += 3
+                elif investor_flow.get("foreign_direction") == "순매도" and ratio is not None and ratio <= 0.95:
+                    score -= 3
             elif investor_flow.get("market_scope") == "global":
                 if investor_flow.get("flow_label") == "유입 우위":
                     score += 4
@@ -871,7 +993,7 @@ class AnalysisService:
         if not investor_flow:
             return None
         if investor_flow.get("market_scope") == "domestic":
-            return investor_flow.get("summary")
+            return investor_flow.get("summary") or investor_flow.get("flow_basis")
         if investor_flow.get("market_scope") == "global":
             flow_label = investor_flow.get("flow_label", "혼조")
             ratio = investor_flow.get("up_down_volume_ratio")
@@ -1011,11 +1133,9 @@ class AnalysisService:
             risks.append("하락 추세 구간에서는 지지선 이탈 시 낙폭이 빠르게 커질 수 있습니다.")
 
         if investor_flow:
-            if investor_flow.get("market_scope") == "domestic":
-                foreign_direction = investor_flow.get("foreign_direction")
-                institution_direction = investor_flow.get("institution_direction")
-                if foreign_direction == institution_direction == "순매도":
-                    risks.append("외국인과 기관이 함께 매도 우위라면 단기 반등의 지속성이 약할 수 있습니다.")
+            if investor_flow.get("market_scope") == "domestic" and investor_flow.get("flow_mode") == "live":
+                if investor_flow.get("foreign_direction") == "순매도":
+                    risks.append("장중 무료 수급 추정상 매도 우위라 단기 반등의 지속성이 약할 수 있습니다.")
             elif investor_flow.get("market_scope") == "global" and investor_flow.get("flow_label") == "유출 우위":
                 risks.append("해외 수급 추정상 자금 유출 우위라 단기 추세가 쉽게 꺾일 수 있습니다.")
 
@@ -1305,9 +1425,11 @@ class AnalysisService:
             reasons.append("스토캐스틱 데드크로스가 과열권에서 나와 단기 타이밍이 불리합니다.")
 
         if investor_flow:
-            if investor_flow.get("market_scope") == "domestic" and investor_flow.get("foreign_direction") == investor_flow.get("institution_direction") == "순매도":
-                penalty += 2 if intraday else 4
-                reasons.append("외국인과 기관이 함께 매도 우위라 수급이 받쳐주지 않고 있습니다.")
+            if investor_flow.get("market_scope") == "domestic" and investor_flow.get("flow_mode") == "live":
+                ratio = investor_flow.get("flow_ratio")
+                if investor_flow.get("foreign_direction") == "순매도" and ratio is not None and ratio <= 0.95:
+                    penalty += 2 if intraday else 0
+                    reasons.append("장중 무료 수급 추정상 매도 우위라 수급이 단기 흐름을 약화시키고 있습니다.")
             elif investor_flow.get("market_scope") == "global" and investor_flow.get("flow_label") == "유출 우위":
                 penalty += 2 if intraday else 3
                 reasons.append("해외 수급 추정상 유출 우위라 단기 추세가 쉽게 꺾일 수 있습니다.")

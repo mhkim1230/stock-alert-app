@@ -196,6 +196,8 @@ class TechnicalAnalysisResponse(BaseModel):
     price_basis: str
     market_context_basis: str
     chart_basis: str
+    flow_mode: Optional[str] = None
+    flow_basis: Optional[str] = None
     summary_title: str
     summary_body: str
     trend_outlook: str

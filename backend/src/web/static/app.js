@@ -510,6 +510,13 @@ function renderAnalysis(data) {
           : "<li>실시간 뉴스·지수·거시 근거가 부족해 시장환경 점수는 중립으로 반영했습니다.</li>"}
       </ul>
     </section>
+    ${(data.flow_basis || data.investor_summary) ? `
+      <section class="analysis-section-card">
+        <h5>수급 반영</h5>
+        <p class="analysis-copy">${data.investor_summary || data.flow_basis}</p>
+        ${data.flow_mode === "excluded" ? '<ul class="analysis-notes"><li>이번 판단에서는 수급 점수를 계산에 넣지 않았습니다.</li></ul>' : ""}
+      </section>
+    ` : ""}
     <section class="analysis-section-card">
       <h5>매수 · 매도 · 손절 구간</h5>
       <div class="analysis-grid analysis-plan-grid">
