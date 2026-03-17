@@ -42,6 +42,20 @@ body {
   padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 }
 
+html.modal-open,
+body.modal-open {
+  overflow: hidden;
+  overscroll-behavior: none;
+  width: 100%;
+  height: 100%;
+}
+
+body.modal-open {
+  position: fixed;
+  left: 0;
+  right: 0;
+}
+
 button,
 input,
 select {
@@ -708,6 +722,8 @@ button:disabled {
   padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
   align-items: stretch;
   overflow-x: hidden;
+  overflow-y: hidden;
+  overscroll-behavior: none;
   overscroll-behavior-x: none;
 }
 
@@ -745,8 +761,10 @@ button:disabled {
   border-radius: 28px;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   overscroll-behavior-x: none;
   touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-sticky-head {

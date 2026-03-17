@@ -53,6 +53,10 @@ const analysisTouchState = {
   y: 0,
 };
 
+const bodyScrollLockState = {
+  y: 0,
+};
+
 async function request(path, options = {}) {
   const { loadingMessage = "불러오는 중입니다...", skipLoading = false, ...fetchOptions } = options;
   beginLoading(loadingMessage, skipLoading);
@@ -833,14 +837,30 @@ function closeStockSearchModal() {
 function openAnalysisModal() {
   closeSwipeActions();
   syncAnalysisRangeSwitch();
+  lockBodyScroll();
   elements.analysisModal.classList.remove("hidden");
 }
 
 function closeAnalysisModal() {
   elements.analysisModal.classList.add("hidden");
+  unlockBodyScroll();
   elements.analysisBody.innerHTML = "";
   setAnalysisHeader();
   state.analysisContext = null;
+}
+
+function lockBodyScroll() {
+  bodyScrollLockState.y = window.scrollY || window.pageYOffset || 0;
+  document.documentElement.classList.add("modal-open");
+  document.body.classList.add("modal-open");
+  document.body.style.top = `-${bodyScrollLockState.y}px`;
+}
+
+function unlockBodyScroll() {
+  document.documentElement.classList.remove("modal-open");
+  document.body.classList.remove("modal-open");
+  document.body.style.top = "";
+  window.scrollTo(0, bodyScrollLockState.y);
 }
 
 function renderStockSearchResults(results) {
