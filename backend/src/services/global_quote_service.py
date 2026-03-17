@@ -149,6 +149,7 @@ class GlobalQuoteService:
         change_value = price - previous_close
         change_percent = self._truncate_percent((change_value / previous_close) * 100)
         return {
+            "symbol": symbol,
             "name": meta.get("shortName") or meta.get("instrumentType") or symbol,
             "price": price,
             "change": round(change_value, 4),
