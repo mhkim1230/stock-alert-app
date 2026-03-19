@@ -1198,12 +1198,6 @@ class AnalysisService:
             elif investor_flow.get("market_scope") == "global" and investor_flow.get("flow_label") == "유출 우위":
                 risks.append("해외 수급 추정상 자금 유출 우위라 단기 추세가 쉽게 꺾일 수 있습니다.")
 
-        news_summary = news_context.get("summary")
-        if news_context.get("news_bias") == "부담" and news_summary:
-            risks.append(news_summary)
-        elif news_context.get("news_bias") == "중립" and news_summary:
-            risks.append("뉴스 흐름은 아직 방향을 강하게 밀어주지 않고 있습니다.")
-
         return list(dict.fromkeys(risks))[:4]
 
     def _build_reason_notes(
@@ -1492,10 +1486,6 @@ class AnalysisService:
             elif investor_flow.get("market_scope") == "global" and investor_flow.get("flow_label") == "유출 우위":
                 penalty += 2 if intraday else 3
                 reasons.append("해외 수급 추정상 유출 우위라 단기 추세가 쉽게 꺾일 수 있습니다.")
-
-        if news_context.get("news_bias") == "부담":
-            penalty += 2 if intraday else 4
-            reasons.append(news_context.get("summary") or "뉴스·국제정세 부담이 단기 변동성을 키우고 있습니다.")
 
         if bollinger.get("position") is not None and bollinger["position"] >= 0.95:
             penalty += 1 if intraday else 2

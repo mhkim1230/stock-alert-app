@@ -411,15 +411,24 @@ class MarketContextService:
         }
 
     def _compose_summary(self, market_eval: Dict, news_eval: Dict, market_bias: str) -> str:
+        market_reasons = [reason for reason in market_eval.get("reasons", []) if reason]
+        news_reasons = [reason for reason in news_eval.get("reasons", []) if reason]
+        primary_factors = (market_reasons[:2] + news_reasons[:1])[:3]
+
+        if market_bias == "우호적":
+            prefix = "현재 외부 환경은 우호적인 쪽입니다."
+        elif market_bias == "부담":
+            prefix = "현재 외부 환경은 부담 요인이 더 큽니다."
+        else:
+            prefix = "현재 외부 환경은 방향성이 강하지 않은 중립 구간입니다."
+
+        if primary_factors:
+            return f"{prefix} {' '.join(primary_factors)}"
+
         market_part = self._compose_market_snapshot(market_eval.get("snapshot") or {})
-        news_part = " ".join(news_eval.get("reasons")[:2])
-        if market_part and news_part:
-            return f"{market_part} {news_part} 현재 시장환경은 {market_bias} 쪽입니다."
         if market_part:
-            return f"{market_part} 현재 시장환경은 {market_bias} 쪽입니다."
-        if news_part:
-            return f"{news_part} 현재 시장환경은 {market_bias} 쪽입니다."
-        return f"현재 수집된 시장환경 근거가 제한적이어서 {market_bias} 수준으로만 해석했습니다."
+            return f"{prefix} {market_part}"
+        return f"{prefix} 수집된 시장환경 근거가 제한적입니다."
 
     @staticmethod
     def _compose_market_snapshot(indicators: Dict[str, Dict]) -> str:
