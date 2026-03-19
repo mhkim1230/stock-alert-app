@@ -446,6 +446,7 @@ function renderAnalysis(data) {
     }),
   ];
   const decisionTitle = data.final_action === "매수" ? "매수 근거" : data.final_action === "매도" ? "매도 근거" : "홀드 근거";
+  const hasFundamentals = data.fundamental_score !== null && data.fundamental_score !== undefined;
 
   setAnalysisHeader({
     title: `${data.name}`,
@@ -474,6 +475,29 @@ function renderAnalysis(data) {
         <li>시장환경 기준: ${data.market_context_basis || "전일 종가 대비 현재 지수·거시 지표"}</li>
       </ul>
     </section>
+    ${hasFundamentals ? `
+      <section class="analysis-section-card">
+        <h5>기업 점검</h5>
+        <p class="analysis-copy">${data.fundamental_summary || "실적 성장 데이터를 바탕으로 기업 체력을 점검했습니다."}</p>
+        <ul class="analysis-notes">
+          ${(data.fundamental_reasons || []).map((reason) => `<li>${reason}</li>`).join("")}
+        </ul>
+      </section>
+      <section class="analysis-section-card">
+        <h5>밸류 부담</h5>
+        <p class="analysis-copy">${data.valuation_summary || "밸류 지표를 기준으로 현재 가격 부담을 점검했습니다."}</p>
+        <ul class="analysis-notes">
+          ${(data.valuation_reasons || []).map((reason) => `<li>${reason}</li>`).join("")}
+        </ul>
+      </section>
+      <section class="analysis-section-card">
+        <h5>재무 품질</h5>
+        <p class="analysis-copy">${data.quality_summary || "재무 건전성과 자본 효율을 함께 확인했습니다."}</p>
+        <ul class="analysis-notes">
+          ${(data.quality_reasons || []).map((reason) => `<li>${reason}</li>`).join("")}
+        </ul>
+      </section>
+    ` : ""}
     <section class="analysis-section-card">
       <h5>${decisionTitle}</h5>
       <ul class="analysis-notes">
@@ -558,6 +582,10 @@ function renderAnalysis(data) {
         ${renderScoreDetailCard("거래량 점수", data.volume_score, data.volume_reasons)}
         ${renderScoreDetailCard("변동성 점수", data.volatility_score, data.volatility_reasons)}
         ${renderScoreDetailCard("시장환경 점수", data.market_context_score, [...(data.macro_reasons || []), ...(data.news_reasons || [])])}
+        ${hasFundamentals ? renderScoreDetailCard("실적 점수", data.fundamental_score, data.fundamental_reasons) : ""}
+        ${hasFundamentals ? renderScoreDetailCard("밸류 점수", data.valuation_score, data.valuation_reasons) : ""}
+        ${hasFundamentals ? renderScoreDetailCard("재무 품질", data.quality_score, data.quality_reasons) : ""}
+        ${hasFundamentals ? renderScoreDetailCard("매수 타이밍", data.timing_score, [...(data.trend_reasons || []), ...(data.momentum_reasons || [])]) : ""}
         ${renderScoreDetailCard("위험 차감", data.weighted_risk_penalty ?? data.risk_penalty, data.risk_reasons)}
       </div>
       <ul class="analysis-notes">

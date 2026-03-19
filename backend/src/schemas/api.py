@@ -228,6 +228,10 @@ class TechnicalAnalysisResponse(BaseModel):
     market_context_score: int
     risk_penalty: int
     weighted_risk_penalty: int
+    fundamental_score: Optional[int] = None
+    valuation_score: Optional[int] = None
+    quality_score: Optional[int] = None
+    timing_score: Optional[int] = None
     price_basis: str
     market_context_basis: str
     chart_basis: str
@@ -246,12 +250,18 @@ class TechnicalAnalysisResponse(BaseModel):
     volume_summary: str
     volatility_summary: str
     market_context_summary: str
+    fundamental_summary: Optional[str] = None
+    valuation_summary: Optional[str] = None
+    quality_summary: Optional[str] = None
     price_reference_summary: str
     decision_reasons: List[str] = Field(default_factory=list)
     trend_reasons: List[str] = Field(default_factory=list)
     momentum_reasons: List[str] = Field(default_factory=list)
     volume_reasons: List[str] = Field(default_factory=list)
     volatility_reasons: List[str] = Field(default_factory=list)
+    fundamental_reasons: List[str] = Field(default_factory=list)
+    valuation_reasons: List[str] = Field(default_factory=list)
+    quality_reasons: List[str] = Field(default_factory=list)
     macro_reasons: List[str] = Field(default_factory=list)
     news_reasons: List[str] = Field(default_factory=list)
     risk_reasons: List[str] = Field(default_factory=list)

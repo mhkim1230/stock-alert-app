@@ -27,6 +27,7 @@ class AnalysisService:
         price_unit = str(quote.get("currency") or ("USD" if not symbol.isdigit() else "KRW")) if quote else ("USD" if not symbol.isdigit() else "KRW")
         live_price = float(quote.get("price")) if quote and quote.get("price") is not None else None
         analysis_window = self._get_analysis_window(period)
+        fundamentals = None
 
         yahoo_symbol = await self._resolve_stock_symbol(symbol, stock_market)
         raw_history = await self._fetch_history(
@@ -46,6 +47,7 @@ class AnalysisService:
         else:
             investor_flow = None
             market_scope = "global"
+            fundamentals = await self.stock_service.get_stock_fundamentals(symbol)
         news_context = await self.market_context_service.build_context(
             asset_type="stock",
             symbol=symbol.upper(),
@@ -64,6 +66,7 @@ class AnalysisService:
             investor_flow=investor_flow,
             news_context=news_context,
             live_price=live_price,
+            fundamentals=fundamentals,
         )
 
     async def get_currency_analysis(self, base: str, target: str, period: str = "short") -> Optional[Dict]:
@@ -598,6 +601,7 @@ class AnalysisService:
         investor_flow: Optional[Dict],
         news_context: Dict,
         live_price: Optional[float] = None,
+        fundamentals: Optional[Dict] = None,
     ) -> Dict:
         closes = [item["close"] for item in history]
         highs = [item["high"] for item in history]
@@ -626,6 +630,7 @@ class AnalysisService:
         bollinger = self._calculate_bollinger(closes, min(20, len(closes)))
         volume_ratio = self._calculate_volume_ratio(volumes, 20)
         volume_signal = self._label_volume_signal(volume_ratio)
+        is_global_stock = asset_type == "stock" and not symbol.isdigit()
 
         if current >= sma20 >= sma60:
             trend = "상승"
@@ -748,6 +753,39 @@ class AnalysisService:
                 - weighted_risk_penalty,
             ),
         )
+        fundamental_score = None
+        valuation_score = None
+        quality_score = None
+        timing_score = None
+        fundamental_summary = None
+        valuation_summary = None
+        quality_summary = None
+        fundamental_reasons: List[str] = []
+        valuation_reasons: List[str] = []
+        quality_reasons: List[str] = []
+
+        if is_global_stock and fundamentals:
+            fundamental_score, fundamental_reasons, fundamental_summary = self._score_fundamentals(fundamentals)
+            valuation_score, valuation_reasons, valuation_summary = self._score_valuation(fundamentals)
+            quality_score, quality_reasons, quality_summary = self._score_quality(fundamentals)
+            timing_score = min(
+                20,
+                round((trend_score + momentum_score + volume_score + volatility_score) / 4),
+            )
+            market_context_component = max(0, min(10, 5 + market_context_score))
+            weighted_risk_penalty = min(12, weighted_risk_penalty)
+            final_score = max(
+                0,
+                min(
+                    100,
+                    fundamental_score
+                    + valuation_score
+                    + quality_score
+                    + timing_score
+                    + market_context_component
+                    - weighted_risk_penalty,
+                ),
+            )
         if final_score >= score_profile["buy_threshold"]:
             final_action = "매수"
         elif final_score <= score_profile["sell_threshold"]:
@@ -771,12 +809,23 @@ class AnalysisService:
             macro_reasons=macro_reasons,
             news_reasons=news_reasons,
             risk_reasons=risk_reasons,
+            fundamental_reasons=fundamental_reasons,
+            valuation_reasons=valuation_reasons,
+            quality_reasons=quality_reasons,
+            is_global_stock=is_global_stock and fundamentals is not None,
         )
-        decision_summary = (
-            f"최종 점수 {final_score}점으로 {final_action} 판단입니다. "
-            f"추세 {trend_score}점, 모멘텀 {momentum_score}점, 거래량 {volume_score}점, 변동성 {volatility_score}점, "
-            f"시장환경은 {market_context_score:+d}점을 반영했고, 기간별 위험 차감은 {weighted_risk_penalty}점입니다."
-        )
+        if is_global_stock and fundamentals:
+            decision_summary = (
+                f"최종 점수 {final_score}점으로 {final_action} 판단입니다. "
+                f"성장·실적 {fundamental_score}점, 밸류 {valuation_score}점, 재무 품질 {quality_score}점, "
+                f"매수 타이밍 {timing_score}점, 시장환경은 {market_context_score:+d}점을 참고했고 위험 차감은 {weighted_risk_penalty}점입니다."
+            )
+        else:
+            decision_summary = (
+                f"최종 점수 {final_score}점으로 {final_action} 판단입니다. "
+                f"추세 {trend_score}점, 모멘텀 {momentum_score}점, 거래량 {volume_score}점, 변동성 {volatility_score}점, "
+                f"시장환경은 {market_context_score:+d}점을 반영했고, 기간별 위험 차감은 {weighted_risk_penalty}점입니다."
+            )
         trend_summary = self._join_reason_summary(
             trend_reasons,
             fallback=f"{profile['primary_label']}선과 {profile['secondary_label']}선 위치를 기준으로 추세를 확인했습니다.",
@@ -847,6 +896,10 @@ class AnalysisService:
             "market_context_score": market_context_score,
             "risk_penalty": risk_penalty,
             "weighted_risk_penalty": weighted_risk_penalty,
+            "fundamental_score": fundamental_score,
+            "valuation_score": valuation_score,
+            "quality_score": quality_score,
+            "timing_score": timing_score,
             "price_basis": "실시간 현재가" if live_price and live_price > 0 else "차트 마지막 종가",
             "market_context_basis": market_context_basis,
             "chart_basis": timeframe,
@@ -865,12 +918,18 @@ class AnalysisService:
             "volume_summary": volume_summary,
             "volatility_summary": volatility_summary,
             "market_context_summary": market_context_summary,
+            "fundamental_summary": fundamental_summary,
+            "valuation_summary": valuation_summary,
+            "quality_summary": quality_summary,
             "price_reference_summary": price_reference_summary,
             "decision_reasons": decision_reasons,
             "trend_reasons": trend_reasons,
             "momentum_reasons": momentum_reasons,
             "volume_reasons": volume_reasons,
             "volatility_reasons": volatility_reasons,
+            "fundamental_reasons": fundamental_reasons,
+            "valuation_reasons": valuation_reasons,
+            "quality_reasons": quality_reasons,
             "macro_reasons": macro_reasons,
             "news_reasons": news_reasons,
             "risk_reasons": risk_reasons,
@@ -1457,12 +1516,168 @@ class AnalysisService:
         macro_reasons: List[str],
         news_reasons: List[str],
         risk_reasons: List[str],
+        fundamental_reasons: List[str],
+        valuation_reasons: List[str],
+        quality_reasons: List[str],
+        is_global_stock: bool,
     ) -> List[str]:
+        if is_global_stock:
+            if final_action == "매수":
+                return (fundamental_reasons[:2] + quality_reasons[:1] + valuation_reasons[:1] + news_reasons[:1])[:5]
+            if final_action == "매도":
+                return (risk_reasons[:2] + valuation_reasons[:1] + macro_reasons[:1] + trend_reasons[:1])[:5]
+            return (fundamental_reasons[:1] + quality_reasons[:1] + valuation_reasons[:1] + risk_reasons[:2])[:5]
         if final_action == "매수":
             return (trend_reasons[:2] + momentum_reasons[:1] + volume_reasons[:1] + news_reasons[:1])[:5]
         if final_action == "매도":
             return (risk_reasons[:3] + macro_reasons[:1] + trend_reasons[:1])[:5]
         return (trend_reasons[:1] + momentum_reasons[:1] + macro_reasons[:1] + risk_reasons[:2])[:5]
+
+    def _score_fundamentals(self, fundamentals: Dict[str, Optional[float]]) -> Tuple[int, List[str], str]:
+        score = 0
+        reasons: List[str] = []
+        revenue_growth = fundamentals.get("revenue_growth")
+        earnings_growth = fundamentals.get("earnings_growth")
+        profit_margins = fundamentals.get("profit_margins")
+        operating_margins = fundamentals.get("operating_margins")
+
+        if revenue_growth is not None:
+            if revenue_growth >= 0.15:
+                score += 10
+                reasons.append(f"매출 성장률이 {revenue_growth * 100:.1f}%로 높아 외형 성장이 강합니다.")
+            elif revenue_growth >= 0.05:
+                score += 7
+                reasons.append(f"매출 성장률이 {revenue_growth * 100:.1f}%로 안정적인 성장 구간입니다.")
+            elif revenue_growth > 0:
+                score += 4
+                reasons.append(f"매출이 전년 대비 {revenue_growth * 100:.1f}% 늘어 성장세는 유지하고 있습니다.")
+            else:
+                reasons.append("매출 성장률이 둔화돼 외형 성장 매력이 강하지 않습니다.")
+
+        if earnings_growth is not None:
+            if earnings_growth >= 0.15:
+                score += 10
+                reasons.append(f"이익 성장률이 {earnings_growth * 100:.1f}%로 높아 수익 개선 폭이 좋습니다.")
+            elif earnings_growth >= 0.05:
+                score += 7
+                reasons.append(f"이익 성장률이 {earnings_growth * 100:.1f}%로 실적 개선 흐름이 이어집니다.")
+            elif earnings_growth > 0:
+                score += 4
+                reasons.append("이익은 증가 중이지만 성장 강도는 아주 강한 편은 아닙니다.")
+            else:
+                reasons.append("이익 성장률이 둔화되거나 역성장 구간이라 실적 모멘텀이 약합니다.")
+
+        margin = operating_margins if operating_margins is not None else profit_margins
+        if margin is not None:
+            if margin >= 0.20:
+                score += 10
+                reasons.append(f"수익성 지표가 {margin * 100:.1f}% 수준으로 높아 질 좋은 성장주에 가깝습니다.")
+            elif margin >= 0.10:
+                score += 7
+                reasons.append(f"수익성 지표가 {margin * 100:.1f}%로 무난한 이익 체력을 보여줍니다.")
+            elif margin > 0:
+                score += 4
+                reasons.append("이익률은 플러스지만 업종 평균 대비 아주 강한 수준은 아닐 수 있습니다.")
+            else:
+                reasons.append("수익성이 낮아 실적의 질은 보수적으로 봐야 합니다.")
+
+        if not reasons:
+            reasons.append("실적 성장과 이익률 데이터가 충분하지 않아 기본 점수만 반영했습니다.")
+        summary = self._join_reason_summary(reasons, "실적 성장과 이익률 근거가 제한적이라 보수적으로 봤습니다.")
+        return min(30, score), reasons[:4], summary
+
+    def _score_valuation(self, fundamentals: Dict[str, Optional[float]]) -> Tuple[int, List[str], str]:
+        score = 8
+        reasons: List[str] = []
+        pe = fundamentals.get("forward_pe") or fundamentals.get("trailing_pe")
+        peg = fundamentals.get("peg_ratio")
+        price_to_sales = fundamentals.get("price_to_sales")
+
+        if pe is not None:
+            if pe <= 18:
+                score += 6
+                reasons.append(f"PER이 {pe:.1f}배 수준이라 밸류 부담이 과도하지 않습니다.")
+            elif pe <= 30:
+                score += 4
+                reasons.append(f"PER이 {pe:.1f}배로 성장주 기준 무난한 밸류 구간입니다.")
+            elif pe <= 45:
+                score += 1
+                reasons.append(f"PER이 {pe:.1f}배로 낮진 않지만 성장 기대를 반영한 수준입니다.")
+            else:
+                score -= 3
+                reasons.append(f"PER이 {pe:.1f}배로 높아 밸류 부담이 큽니다.")
+
+        if peg is not None:
+            if peg <= 1.5:
+                score += 4
+                reasons.append(f"PEG가 {peg:.2f}배라 성장 대비 가격이 비교적 합리적입니다.")
+            elif peg <= 2.5:
+                score += 2
+                reasons.append(f"PEG가 {peg:.2f}배로 성장 기대를 감안하면 수용 가능한 수준입니다.")
+            else:
+                score -= 2
+                reasons.append(f"PEG가 {peg:.2f}배라 성장 대비 가격 부담이 있습니다.")
+
+        if price_to_sales is not None:
+            if price_to_sales <= 4:
+                score += 3
+                reasons.append(f"PSR이 {price_to_sales:.2f}배로 매출 대비 평가가 과열되진 않았습니다.")
+            elif price_to_sales >= 12:
+                score -= 2
+                reasons.append(f"PSR이 {price_to_sales:.2f}배로 매출 대비 평가가 높은 편입니다.")
+
+        score = max(0, min(20, score))
+        summary = self._join_reason_summary(reasons, "밸류 지표가 제한적이라 평균적인 가격 부담으로 봤습니다.")
+        return score, reasons[:4], summary
+
+    def _score_quality(self, fundamentals: Dict[str, Optional[float]]) -> Tuple[int, List[str], str]:
+        score = 0
+        reasons: List[str] = []
+        debt_to_equity = fundamentals.get("debt_to_equity")
+        current_ratio = fundamentals.get("current_ratio")
+        quick_ratio = fundamentals.get("quick_ratio")
+        roe = fundamentals.get("return_on_equity")
+        beta = fundamentals.get("beta")
+
+        if debt_to_equity is not None:
+            if debt_to_equity <= 80:
+                score += 6
+                reasons.append(f"부채비율 성격의 지표가 {debt_to_equity:.1f}로 재무 부담이 과하지 않습니다.")
+            elif debt_to_equity <= 150:
+                score += 3
+                reasons.append(f"부채 수준은 관리 가능하지만 아주 가볍진 않습니다.")
+            else:
+                reasons.append("부채 부담이 있어 금리 환경 변화에 민감할 수 있습니다.")
+
+        liquidity = quick_ratio if quick_ratio is not None else current_ratio
+        if liquidity is not None:
+            if liquidity >= 1.2:
+                score += 5
+                reasons.append(f"유동성 지표가 {liquidity:.2f}배로 단기 재무 안정성이 양호합니다.")
+            elif liquidity >= 0.9:
+                score += 3
+                reasons.append("유동성은 무난한 수준입니다.")
+            else:
+                reasons.append("유동성 지표가 낮아 재무 완충력이 약할 수 있습니다.")
+
+        if roe is not None:
+            if roe >= 0.18:
+                score += 6
+                reasons.append(f"ROE가 {roe * 100:.1f}%로 자본 효율이 높습니다.")
+            elif roe >= 0.10:
+                score += 4
+                reasons.append(f"ROE가 {roe * 100:.1f}%로 자본 효율은 양호한 편입니다.")
+            elif roe > 0:
+                score += 2
+                reasons.append("ROE는 플러스지만 강한 수준은 아닙니다.")
+
+        if beta is not None and beta >= 1.8:
+            reasons.append(f"베타가 {beta:.2f}로 높아 시장 변동성에 더 민감할 수 있습니다.")
+
+        if not reasons:
+            reasons.append("재무 건전성과 자본 효율 데이터가 제한적이라 품질 점수는 보수적으로 반영했습니다.")
+        summary = self._join_reason_summary(reasons, "재무 건전성과 자본 효율은 보통 수준으로 봤습니다.")
+        return min(20, score), reasons[:4], summary
 
     @staticmethod
     def _calculate_rsi(closes: List[float], period: int) -> Optional[float]:

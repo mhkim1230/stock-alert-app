@@ -67,6 +67,12 @@ class StockService:
             return await self.domestic.get_quote(normalized_symbol)
         return await self.global_quote.get_quote(normalized_symbol)
 
+    async def get_stock_fundamentals(self, symbol: str) -> Optional[Dict[str, Any]]:
+        normalized_symbol = str(symbol or "").strip().upper()
+        if not normalized_symbol or normalized_symbol.isdigit():
+            return None
+        return await self.global_quote.get_fundamentals(normalized_symbol)
+
     @staticmethod
     def _coerce_float(value: Any) -> Optional[float]:
         if value is None or value == "":
