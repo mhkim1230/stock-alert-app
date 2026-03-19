@@ -54,6 +54,10 @@ class WatchlistQuotesRefreshRequest(BaseModel):
     symbols: List[str] = Field(default_factory=list)
 
 
+class FxWatchlistQuotesRefreshRequest(BaseModel):
+    pairs: List[str] = Field(default_factory=list)
+
+
 class StockQuoteSnapshotResponse(BaseModel):
     symbol: str
     name: str
@@ -62,6 +66,18 @@ class StockQuoteSnapshotResponse(BaseModel):
     change: Optional[float] = None
     change_percent: Optional[float] = None
     currency: str
+    source: str
+    fetched_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class FxRateSnapshotResponse(BaseModel):
+    pair_key: str
+    base_currency: str
+    target_currency: str
+    rate: float
     source: str
     fetched_at: datetime
 

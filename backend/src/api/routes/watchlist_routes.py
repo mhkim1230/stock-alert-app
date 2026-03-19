@@ -8,16 +8,20 @@ from src.api.dependencies import get_protected_db
 from src.models.database import FxWatchlistItem, WatchlistItem
 from src.schemas.api import (
     FxWatchlistItemCreate,
+    FxRateSnapshotResponse,
     FxWatchlistItemResponse,
+    FxWatchlistQuotesRefreshRequest,
     StockQuoteSnapshotResponse,
     WatchlistItemCreate,
     WatchlistItemResponse,
     WatchlistQuotesRefreshRequest,
 )
+from src.services.fx_watchlist_quote_service import FxWatchlistQuoteService
 from src.services.watchlist_quote_service import WatchlistQuoteService
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 watchlist_quote_service = WatchlistQuoteService()
+fx_watchlist_quote_service = FxWatchlistQuoteService()
 
 
 @router.get("", response_model=List[WatchlistItemResponse])
@@ -44,6 +48,11 @@ async def list_fx_watchlist(db: AsyncSession = Depends(get_protected_db)):
 @router.get("/quotes", response_model=List[StockQuoteSnapshotResponse])
 async def list_watchlist_quotes(db: AsyncSession = Depends(get_protected_db)):
     return await watchlist_quote_service.list_snapshots(db)
+
+
+@router.get("/fx/quotes", response_model=List[FxRateSnapshotResponse])
+async def list_fx_watchlist_quotes(db: AsyncSession = Depends(get_protected_db)):
+    return await fx_watchlist_quote_service.list_snapshots(db)
 
 
 @router.post("", response_model=WatchlistItemResponse, status_code=status.HTTP_201_CREATED)
@@ -90,6 +99,13 @@ async def refresh_watchlist_quotes(
     return await watchlist_quote_service.refresh_snapshots(db, payload.symbols)
 
 
+@router.post("/fx/quotes/refresh", response_model=List[FxRateSnapshotResponse])
+async def refresh_fx_watchlist_quotes(
+    payload: FxWatchlistQuotesRefreshRequest, db: AsyncSession = Depends(get_protected_db)
+):
+    return await fx_watchlist_quote_service.refresh_snapshots(db, payload.pairs)
+
+
 @router.delete("/fx/{base_currency}/{target_currency}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_fx_watchlist_item(
     base_currency: str, target_currency: str, db: AsyncSession = Depends(get_protected_db)
@@ -106,6 +122,7 @@ async def delete_fx_watchlist_item(
         raise HTTPException(status_code=404, detail="FX watchlist pair not found")
     await db.delete(item)
     await db.commit()
+    await fx_watchlist_quote_service.delete_snapshot(db, base_currency.upper(), target_currency.upper())
 
 
 @router.delete("/{symbol}", status_code=status.HTTP_204_NO_CONTENT)

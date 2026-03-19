@@ -6,6 +6,7 @@ from src.config.settings import settings
 from src.schemas.api import InternalRefreshResponse, InternalRunResponse
 from src.services.alert_service import AlertService
 from src.services.currency_service import CurrencyService
+from src.services.fx_watchlist_quote_service import FxWatchlistQuoteService
 from src.services.news_service import NewsService
 from src.services.notification_service import NotificationService
 from src.services.stock_service import StockService
@@ -19,6 +20,7 @@ alert_service = AlertService(
     notification_service=NotificationService(settings),
 )
 watchlist_quote_service = WatchlistQuoteService()
+fx_watchlist_quote_service = FxWatchlistQuoteService()
 
 
 @router.post("/run-alert-checks", response_model=InternalRunResponse)
@@ -30,4 +32,10 @@ async def run_alert_checks(db: AsyncSession = Depends(get_protected_db)):
 @router.post("/refresh-watchlist-quotes", response_model=InternalRefreshResponse)
 async def refresh_watchlist_quotes(db: AsyncSession = Depends(get_protected_db)):
     snapshots = await watchlist_quote_service.refresh_snapshots(db)
+    return {"status": "ok", "refreshed": len(snapshots)}
+
+
+@router.post("/refresh-fx-quotes", response_model=InternalRefreshResponse)
+async def refresh_fx_quotes(db: AsyncSession = Depends(get_protected_db)):
+    snapshots = await fx_watchlist_quote_service.refresh_snapshots(db)
     return {"status": "ok", "refreshed": len(snapshots)}

@@ -253,7 +253,7 @@ function fxRateMarkup(base, target) {
     return `<small class="meta-line">현재 환율을 아직 불러오지 못했습니다.</small>`;
   }
   return `
-    <small class="meta-line">${rate.source}</small>
+    <small class="meta-line">${rate.source}${rate.fetched_at ? ` · ${toLocalDate(rate.fetched_at)}` : ""}</small>
     <div class="quote-line">
       <span class="quote-price">${formatRate(rate.rate, target)}</span>
     </div>
@@ -711,26 +711,23 @@ async function refreshSingleStockQuote(symbol) {
 }
 
 async function refreshFxRates() {
-  const rates = await Promise.all(
-    state.fxWatchlist.map(async (pair) => {
-      try {
-        const payload = await request(
-          `/currency/rate?base=${encodeURIComponent(pair.base)}&target=${encodeURIComponent(pair.target)}`,
-          { skipLoading: true }
-        );
-        return [`${pair.base}/${pair.target}`, payload];
-      } catch {
-        return [`${pair.base}/${pair.target}`, null];
-      }
-    })
+  const rates = await request("/watchlist/fx/quotes", {
+    skipLoading: true,
+  });
+  state.fxRates = Object.fromEntries(
+    rates.map((rate) => [
+      `${String(rate.base_currency).toUpperCase()}/${String(rate.target_currency).toUpperCase()}`,
+      rate,
+    ])
   );
-  state.fxRates = Object.fromEntries(rates);
 }
 
 async function refreshData() {
-  const [watchlist, fxWatchlist] = await Promise.all([
+  const [watchlist, fxWatchlist, stockQuotes, fxQuotes] = await Promise.all([
     request("/watchlist", { loadingMessage: "관심종목을 불러오는 중입니다..." }),
     request("/watchlist/fx", { loadingMessage: "관심환율을 불러오는 중입니다..." }),
+    request("/watchlist/quotes", { skipLoading: true }),
+    request("/watchlist/fx/quotes", { skipLoading: true }),
   ]);
 
   state.watchlist = watchlist;
@@ -739,8 +736,15 @@ async function refreshData() {
     base: item.base_currency,
     target: item.target_currency,
   }));
-
-  await Promise.all([refreshStockQuotes(), refreshFxRates()]);
+  state.stockQuotes = Object.fromEntries(
+    stockQuotes.map((quote) => [String(quote.symbol).toUpperCase(), quote])
+  );
+  state.fxRates = Object.fromEntries(
+    fxQuotes.map((rate) => [
+      `${String(rate.base_currency).toUpperCase()}/${String(rate.target_currency).toUpperCase()}`,
+      rate,
+    ])
+  );
   renderAll();
 }
 
@@ -774,9 +778,6 @@ async function bootstrap() {
     await migrateLegacyFxWatchlist();
     showLoggedIn();
     await refreshData();
-    if (hasSelectedFxPair()) {
-      await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
-    }
   } catch {
     showLoggedOut();
   }
@@ -799,9 +800,6 @@ async function handleLogin(event) {
     form.reset();
     showLoggedIn();
     await refreshData();
-    if (hasSelectedFxPair()) {
-      await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
-    }
     showToast("로그인되었습니다.", "success");
   } catch (error) {
     elements.loginError.textContent = error.message;
@@ -1081,12 +1079,25 @@ async function handleListActions(event) {
       const { base, target } = state.lastFxLookup;
       const exists = state.fxWatchlist.some((item) => item.base === base && item.target === target);
       if (!exists) {
-        await request("/watchlist/fx", {
+        const created = await request("/watchlist/fx", {
           method: "POST",
           body: JSON.stringify({ base_currency: base, target_currency: target }),
           loadingMessage: "현재 환율 페어를 저장하는 중입니다...",
         });
-        await refreshData();
+        state.fxWatchlist = [
+          ...state.fxWatchlist,
+          { id: created.id, base: created.base_currency, target: created.target_currency },
+        ].sort((left, right) => `${left.base}/${left.target}`.localeCompare(`${right.base}/${right.target}`, "ko-KR"));
+        const snapshots = await request("/watchlist/fx/quotes/refresh", {
+          method: "POST",
+          body: JSON.stringify({ pairs: [`${base}/${target}`] }),
+          skipLoading: true,
+        });
+        snapshots.forEach((rate) => {
+          const key = `${String(rate.base_currency).toUpperCase()}/${String(rate.target_currency).toUpperCase()}`;
+          state.fxRates[key] = rate;
+        });
+        renderFxWatchlist();
       }
       showToast("현재 환율 페어를 저장했습니다.", "success");
       return;
@@ -1173,7 +1184,12 @@ async function handleListActions(event) {
           }
         );
       });
-      await refreshData();
+      {
+        const pair = `${String(trigger.dataset.base).toUpperCase()}/${String(trigger.dataset.target).toUpperCase()}`;
+        state.fxWatchlist = state.fxWatchlist.filter((item) => `${item.base}/${item.target}` !== pair);
+        delete state.fxRates[pair];
+      }
+      renderFxWatchlist();
       showToast("관심환율을 삭제했습니다.", "info");
       return;
     }
@@ -1323,9 +1339,6 @@ elements.refreshWatchlistButton?.addEventListener("click", async () => {
 elements.refreshDashboard.addEventListener("click", async () => {
   await withButtonBusy(elements.refreshDashboard, "새로고침 중...", async () => {
     await refreshData();
-    if (hasSelectedFxPair()) {
-      await handleFxLookupWithPair(state.lastFxLookup.base, state.lastFxLookup.target);
-    }
   });
   showToast("데이터를 새로고침했습니다.", "success");
 });
