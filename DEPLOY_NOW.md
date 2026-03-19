@@ -27,13 +27,33 @@
 - `DEBUG=false`
 - `APNS_USE_SANDBOX=true`
 
-## 3. Cron
-웹서비스 배포가 끝난 뒤 Render 대시보드에서 Cron Job을 별도로 추가합니다.
+## 3. Snapshot Refresh
+Render free 플랜에서는 Cron Job을 쓸 수 없으므로, GitHub Actions가 5분마다 스냅샷 갱신을 호출합니다.
+
+GitHub 저장소 `Settings -> Secrets and variables -> Actions` 에 아래 두 값을 추가합니다.
+- `RENDER_BASE_URL`
+- `ADMIN_API_KEY`
 
 예:
+```text
+RENDER_BASE_URL=https://stock-alert-app.onrender.com
+ADMIN_API_KEY=stockalert-admin-2026-secret-key-1230
+```
+
+워크플로 파일:
+- `.github/workflows/refresh-market-snapshots.yml`
+
+실행 내용:
+- `POST /internal/refresh-watchlist-quotes`
+- `POST /internal/refresh-fx-quotes`
+
+수동 실행도 가능합니다.
 ```bash
-curl -X POST https://YOUR_RENDER_APP.onrender.com/internal/run-alert-checks \
-  -H "X-Admin-Key: $ADMIN_API_KEY"
+curl -X POST https://YOUR_RENDER_APP.onrender.com/internal/refresh-watchlist-quotes \
+  -H "X-Admin-Key: YOUR_ADMIN_API_KEY"
+
+curl -X POST https://YOUR_RENDER_APP.onrender.com/internal/refresh-fx-quotes \
+  -H "X-Admin-Key: YOUR_ADMIN_API_KEY"
 ```
 
 ## 4. iPhone App
