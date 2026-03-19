@@ -419,6 +419,22 @@ function renderAnalysis(data) {
       </ul>
     </div>
   `;
+  const dedupeAnalysisReasons = (reasons = [], excluded = []) => {
+    const blocked = new Set(
+      excluded
+        .map((item) => String(item || "").trim())
+        .filter(Boolean),
+    );
+    const seen = new Set();
+    return reasons.filter((reason) => {
+      const normalized = String(reason || "").trim();
+      if (!normalized || blocked.has(normalized) || seen.has(normalized)) {
+        return false;
+      }
+      seen.add(normalized);
+      return true;
+    });
+  };
   const buySellCards = [
     renderAnalysisValueCard({
       label: "1차 매수가",
@@ -447,6 +463,14 @@ function renderAnalysis(data) {
   ];
   const decisionTitle = data.final_action === "매수" ? "매수 근거" : data.final_action === "매도" ? "매도 근거" : "홀드 근거";
   const hasFundamentals = data.fundamental_score !== null && data.fundamental_score !== undefined;
+  const marketReasonList = dedupeAnalysisReasons([
+    ...(data.macro_reasons || []),
+    ...(data.news_reasons || []),
+  ]);
+  const filteredRiskReasons = dedupeAnalysisReasons(
+    data.risk_reasons || [],
+    [data.market_context_summary, ...marketReasonList],
+  );
 
   setAnalysisHeader({
     title: `${data.name}`,
@@ -536,11 +560,8 @@ function renderAnalysis(data) {
       <h5>시장환경 해석</h5>
       <p class="analysis-copy">${data.market_context_summary || "실시간 시장환경 근거가 충분하지 않아 보수적으로 해석했습니다."}</p>
       <ul class="analysis-notes">
-        ${[
-          ...(data.macro_reasons || []),
-          ...(data.news_reasons || []),
-        ].length
-          ? [...(data.macro_reasons || []), ...(data.news_reasons || [])].map((reason) => `<li>${reason}</li>`).join("")
+        ${marketReasonList.length
+          ? marketReasonList.map((reason) => `<li>${reason}</li>`).join("")
           : "<li>실시간 뉴스·지수·거시 근거가 부족해 시장환경 점수는 중립으로 반영했습니다.</li>"}
       </ul>
     </section>
@@ -571,7 +592,7 @@ function renderAnalysis(data) {
     <section class="analysis-section-card">
       <h5>위험 요인</h5>
       <ul class="analysis-notes">
-        ${(data.risk_reasons || []).length ? data.risk_reasons.map((note) => `<li>${note}</li>`).join("") : "<li>현재 확인된 특이 위험 요인은 제한적입니다.</li>"}
+        ${filteredRiskReasons.length ? filteredRiskReasons.map((note) => `<li>${note}</li>`).join("") : "<li>현재 확인된 특이 위험 요인은 제한적입니다.</li>"}
       </ul>
     </section>
     <details class="analysis-section-card analysis-details">
@@ -581,12 +602,12 @@ function renderAnalysis(data) {
         ${renderScoreDetailCard("모멘텀 점수", data.momentum_score, data.momentum_reasons)}
         ${renderScoreDetailCard("거래량 점수", data.volume_score, data.volume_reasons)}
         ${renderScoreDetailCard("변동성 점수", data.volatility_score, data.volatility_reasons)}
-        ${renderScoreDetailCard("시장환경 점수", data.market_context_score, [...(data.macro_reasons || []), ...(data.news_reasons || [])])}
+        ${renderScoreDetailCard("시장환경 점수", data.market_context_score, marketReasonList)}
         ${hasFundamentals ? renderScoreDetailCard("실적 점수", data.fundamental_score, data.fundamental_reasons) : ""}
         ${hasFundamentals ? renderScoreDetailCard("밸류 점수", data.valuation_score, data.valuation_reasons) : ""}
         ${hasFundamentals ? renderScoreDetailCard("재무 품질", data.quality_score, data.quality_reasons) : ""}
         ${hasFundamentals ? renderScoreDetailCard("매수 타이밍", data.timing_score, [...(data.trend_reasons || []), ...(data.momentum_reasons || [])]) : ""}
-        ${renderScoreDetailCard("위험 차감", data.weighted_risk_penalty ?? data.risk_penalty, data.risk_reasons)}
+        ${renderScoreDetailCard("위험 차감", data.weighted_risk_penalty ?? data.risk_penalty, filteredRiskReasons)}
       </div>
       <ul class="analysis-notes">
         ${(data.notes || []).map((note) => `<li>${note}</li>`).join("")}

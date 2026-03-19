@@ -411,24 +411,36 @@ class MarketContextService:
         }
 
     def _compose_summary(self, market_eval: Dict, news_eval: Dict, market_bias: str) -> str:
-        market_reasons = [reason for reason in market_eval.get("reasons", []) if reason]
-        news_reasons = [reason for reason in news_eval.get("reasons", []) if reason]
-        primary_factors = (market_reasons[:2] + news_reasons[:1])[:3]
+        snapshot = market_eval.get("snapshot") or {}
+        themes = list(news_eval.get("themes") or [])
+        news_bias = news_eval.get("bias") or "중립"
 
         if market_bias == "우호적":
-            prefix = "현재 외부 환경은 우호적인 쪽입니다."
+            prefix = "현재 외부 환경은 우호적인 흐름이 더 강합니다."
         elif market_bias == "부담":
-            prefix = "현재 외부 환경은 부담 요인이 더 큽니다."
+            prefix = "현재 외부 환경은 부담 요인이 우세합니다."
         else:
-            prefix = "현재 외부 환경은 방향성이 강하지 않은 중립 구간입니다."
+            prefix = "현재 외부 환경은 뚜렷한 한쪽 방향 없이 중립에 가깝습니다."
 
-        if primary_factors:
-            return f"{prefix} {' '.join(primary_factors)}"
-
-        market_part = self._compose_market_snapshot(market_eval.get("snapshot") or {})
+        summary_parts: List[str] = [prefix]
+        market_part = self._compose_market_snapshot(snapshot)
         if market_part:
-            return f"{prefix} {market_part}"
-        return f"{prefix} 수집된 시장환경 근거가 제한적입니다."
+            summary_parts.append(market_part)
+
+        if themes:
+            theme_text = ", ".join(themes[:2])
+            if news_bias == "우호적":
+                summary_parts.append(f"뉴스 흐름은 {theme_text} 이슈를 중심으로 비교적 우호적입니다.")
+            elif news_bias == "부담":
+                summary_parts.append(f"뉴스 흐름은 {theme_text} 이슈를 중심으로 투자심리를 눌러두고 있습니다.")
+            else:
+                summary_parts.append(f"뉴스 흐름은 {theme_text} 이슈가 섞여 있어 방향성이 크지 않습니다.")
+        elif news_bias == "우호적":
+            summary_parts.append("뉴스 흐름은 전반적으로 우호적인 편입니다.")
+        elif news_bias == "부담":
+            summary_parts.append("뉴스 흐름은 전반적으로 보수적인 편입니다.")
+
+        return " ".join(summary_parts).strip() or f"{prefix} 수집된 시장환경 근거가 제한적입니다."
 
     @staticmethod
     def _compose_market_snapshot(indicators: Dict[str, Dict]) -> str:
