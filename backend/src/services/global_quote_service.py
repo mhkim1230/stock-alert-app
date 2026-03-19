@@ -97,7 +97,7 @@ class GlobalQuoteService:
     async def _fetch_yahoo_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
         chart_url = (
             "https://query1.finance.yahoo.com/v8/finance/chart/"
-            f"{symbol}?range=5d&interval=1d&includePrePost=false"
+            f"{symbol}?range=2d&interval=1m&includePrePost=true"
         )
         payload = await self._fetch_json(chart_url)
         chart_result = (((payload or {}).get("chart") or {}).get("result") or [None])[0]
@@ -105,9 +105,11 @@ class GlobalQuoteService:
             return None
 
         meta = chart_result.get("meta") or {}
-        price = self._coerce_float(meta.get("regularMarketPrice"))
+        price = self._extract_latest_trade_price(chart_result)
+        if price is None:
+            price = self._coerce_float(meta.get("regularMarketPrice"))
         previous_close = self._coerce_float(
-            meta.get("regularMarketPreviousClose") or meta.get("chartPreviousClose") or meta.get("previousClose")
+            meta.get("previousClose") or meta.get("chartPreviousClose") or meta.get("regularMarketPreviousClose")
         )
         if price is None or previous_close in (None, 0):
             return None
@@ -121,7 +123,7 @@ class GlobalQuoteService:
             "change_percent": self._truncate_percent((change_value / previous_close) * 100),
             "currency": meta.get("currency", "USD"),
             "market": self._normalize_yahoo_market(meta.get("exchangeName") or meta.get("fullExchangeName")),
-            "source": f"global:yahoo_quote:{symbol}",
+            "source": f"global:yahoo_extended_quote:{symbol}",
         }
 
     async def _fetch_yahoo_fundamentals(self, symbol: str) -> Optional[Dict[str, Any]]:
@@ -267,6 +269,15 @@ class GlobalQuoteService:
         if isinstance(value, dict):
             value = value.get("raw")
         return GlobalQuoteService._coerce_float(value)
+
+    def _extract_latest_trade_price(self, chart_result: Dict[str, Any]) -> Optional[float]:
+        quote = (((chart_result.get("indicators") or {}).get("quote") or [None])[0]) or {}
+        closes = quote.get("close") or []
+        for value in reversed(closes):
+            coerced = self._coerce_float(value)
+            if coerced is not None and coerced > 0:
+                return coerced
+        return None
 
     @staticmethod
     def _latest_reported_value(item: Optional[Dict[str, Any]], key: str) -> Optional[float]:

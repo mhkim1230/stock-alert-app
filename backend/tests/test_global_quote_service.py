@@ -9,7 +9,7 @@ from src.services.global_quote_service import GlobalQuoteService
 
 
 @pytest.mark.asyncio
-async def test_get_quote_uses_chart_meta_regular_previous_close(monkeypatch):
+async def test_get_quote_uses_latest_trade_price_and_previous_close(monkeypatch):
     async def fake_fetch_json(self, url: str):
         assert "finance/chart/NVDA" in url
         return {
@@ -18,11 +18,18 @@ async def test_get_quote_uses_chart_meta_regular_previous_close(monkeypatch):
                     {
                         "meta": {
                             "regularMarketPrice": 183.22,
-                            "regularMarketPreviousClose": 180.25,
+                            "previousClose": 180.25,
                             "currency": "USD",
                             "shortName": "NVIDIA Corporation",
                             "exchangeName": "NMS",
-                        }
+                        },
+                        "indicators": {
+                            "quote": [
+                                {
+                                    "close": [181.1, None, 183.22, 184.55],
+                                }
+                            ]
+                        },
                     }
                 ]
             }
@@ -34,11 +41,11 @@ async def test_get_quote_uses_chart_meta_regular_previous_close(monkeypatch):
     quote = await service.get_quote("NVDA")
 
     assert quote is not None
-    assert quote["price"] == 183.22
-    assert quote["change"] == 2.97
-    assert quote["change_percent"] == 1.64
+    assert quote["price"] == 184.55
+    assert quote["change"] == 4.3
+    assert quote["change_percent"] == 2.38
     assert quote["market"] == "NASDAQ"
-    assert quote["source"] == "global:yahoo_quote:NVDA"
+    assert quote["source"] == "global:yahoo_extended_quote:NVDA"
 
 
 @pytest.mark.asyncio
