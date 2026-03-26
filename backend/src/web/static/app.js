@@ -11,6 +11,7 @@ const state = {
   currentFxResult: null,
   analysisContext: null,
   openSwipeId: "",
+  sessionChecked: false,
 };
 
 const loadingState = {
@@ -125,6 +126,12 @@ function setFormBusy(form, busy, busyText = "처리 중...") {
 
 function setButtonBusy(button, busy, busyText = "처리 중...") {
   if (!button) {
+    return;
+  }
+  if (button.classList.contains("icon-button")) {
+    button.disabled = busy;
+    button.setAttribute("aria-busy", busy ? "true" : "false");
+    button.classList.toggle("is-busy", busy);
     return;
   }
   if (!button.dataset.defaultLabel) {
@@ -736,6 +743,18 @@ function renderAll() {
   renderFxWatchlist();
 }
 
+function renderBootPlaceholders() {
+  elements.watchlistList.innerHTML = `
+    <li class="empty-state loading-state">관심종목을 불러오는 중입니다...</li>
+  `;
+  elements.fxWatchlistList.innerHTML = `
+    <li class="empty-state loading-state">관심환율을 불러오는 중입니다...</li>
+  `;
+  if (!state.currentFxResult) {
+    elements.fxResult.innerHTML = `<div class="callout loading-state">저장된 시세를 불러오는 중입니다...</div>`;
+  }
+}
+
 async function refreshStockQuotes() {
   const quotes = await request("/watchlist/quotes", {
     skipLoading: true,
@@ -822,12 +841,18 @@ function resetStockSearchModalState() {
 }
 
 async function bootstrap() {
+  renderBootPlaceholders();
+  elements.appPanel.classList.remove("hidden");
+  elements.logoutButton.classList.add("hidden");
+  elements.loginPanel.classList.add("hidden");
   try {
-    await request("/session/me", { loadingMessage: "세션을 확인하는 중입니다..." });
+    await request("/session/me", { loadingMessage: "세션을 확인하는 중입니다...", skipLoading: true });
     await migrateLegacyFxWatchlist();
+    state.sessionChecked = true;
     showLoggedIn();
     await refreshData();
   } catch {
+    state.sessionChecked = true;
     showLoggedOut();
   }
 }
@@ -848,6 +873,7 @@ async function handleLogin(event) {
     });
     form.reset();
     showLoggedIn();
+    renderBootPlaceholders();
     await refreshData();
     showToast("로그인되었습니다.", "success");
   } catch (error) {
@@ -1098,6 +1124,7 @@ function setupEnterSubmit() {
 
 async function handleListActions(event) {
   const surface = event.target.closest("[data-swipe-surface]");
+  let rollback = null;
   if (surface && !event.target.closest("[data-action]")) {
     setOpenSwipe(surface.dataset.swipeSurface || "");
     renderAll();
@@ -1182,44 +1209,82 @@ async function handleListActions(event) {
     }
     if (action === "add-watchlist-symbol") {
       await withButtonBusy(trigger, "추가 중...", async () => {
-        const created = await request("/watchlist", {
-          method: "POST",
-          body: JSON.stringify({ symbol: trigger.dataset.symbol }),
-          loadingMessage: "관심종목에 추가하는 중입니다...",
-        });
-        const symbol = String(created.symbol || trigger.dataset.symbol).toUpperCase();
-        const exists = state.watchlist.some((item) => String(item.symbol).toUpperCase() === symbol);
-        if (!exists) {
-          state.watchlist = [...state.watchlist, created].sort((left, right) =>
-            String(left.symbol).localeCompare(String(right.symbol), "ko-KR")
-          );
+        const symbol = String(trigger.dataset.symbol || "").toUpperCase();
+        const existing = state.watchlist.some((item) => String(item.symbol).toUpperCase() === symbol);
+        if (existing) {
+          closeStockSearchModal();
+          setView("watchlist");
+          return;
         }
+
+        const optimisticItem = {
+          id: `pending-${symbol}`,
+          symbol,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        const previousQuote = state.stockQuotes[symbol];
+        state.watchlist = [...state.watchlist, optimisticItem].sort((left, right) =>
+          String(left.symbol).localeCompare(String(right.symbol), "ko-KR")
+        );
+        state.stockQuotes[symbol] = state.stockQuotes[symbol] || null;
         renderStockWatchlist();
         setView("watchlist");
         closeStockSearchModal();
+        rollback = () => {
+          state.watchlist = state.watchlist.filter((item) => String(item.symbol).toUpperCase() !== symbol);
+          if (previousQuote === undefined) {
+            delete state.stockQuotes[symbol];
+          } else {
+            state.stockQuotes[symbol] = previousQuote;
+          }
+          renderStockWatchlist();
+        };
+
+        const created = await request("/watchlist", {
+          method: "POST",
+          body: JSON.stringify({ symbol }),
+          loadingMessage: "관심종목에 추가하는 중입니다...",
+        });
+        state.watchlist = state.watchlist
+          .filter((item) => String(item.symbol).toUpperCase() !== symbol || !String(item.id || "").startsWith("pending-"))
+          .concat(created)
+          .sort((left, right) => String(left.symbol).localeCompare(String(right.symbol), "ko-KR"));
+        renderStockWatchlist();
         try {
           await refreshSingleStockQuote(symbol);
         } catch {
           state.stockQuotes[symbol] = null;
         }
+        renderStockWatchlist();
+        rollback = null;
       });
-      renderStockWatchlist();
       showToast("관심종목을 추가했습니다.", "success");
       return;
     }
     if (action === "delete-watchlist") {
+      const symbol = String(trigger.dataset.symbol || "").toUpperCase();
+      const prevWatchlist = [...state.watchlist];
+      const prevQuote = state.stockQuotes[symbol];
+      state.watchlist = state.watchlist.filter((item) => String(item.symbol).toUpperCase() !== symbol);
+      delete state.stockQuotes[symbol];
+      renderStockWatchlist();
+      rollback = () => {
+        state.watchlist = prevWatchlist;
+        if (prevQuote === undefined) {
+          delete state.stockQuotes[symbol];
+        } else {
+          state.stockQuotes[symbol] = prevQuote;
+        }
+        renderStockWatchlist();
+      };
       await withButtonBusy(trigger, "삭제 중...", async () => {
-        await request(`/watchlist/${trigger.dataset.symbol}`, {
+        await request(`/watchlist/${symbol}`, {
           method: "DELETE",
           loadingMessage: "관심종목을 삭제하는 중입니다...",
         });
       });
-      {
-        const symbol = String(trigger.dataset.symbol || "").toUpperCase();
-        state.watchlist = state.watchlist.filter((item) => String(item.symbol).toUpperCase() !== symbol);
-        delete state.stockQuotes[symbol];
-      }
-      renderStockWatchlist();
+      rollback = null;
       showToast("관심종목을 삭제했습니다.", "info");
       return;
     }
@@ -1243,6 +1308,9 @@ async function handleListActions(event) {
       return;
     }
   } catch (error) {
+    if (typeof rollback === "function") {
+      rollback();
+    }
     showToast(error.message, "error");
   }
 }
