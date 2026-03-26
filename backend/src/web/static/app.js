@@ -791,24 +791,21 @@ async function refreshFxRates() {
 }
 
 async function refreshData() {
-  const [watchlist, fxWatchlist, stockQuotes, fxQuotes] = await Promise.all([
-    request("/watchlist", { loadingMessage: "관심종목을 불러오는 중입니다..." }),
-    request("/watchlist/fx", { loadingMessage: "관심환율을 불러오는 중입니다..." }),
-    request("/watchlist/quotes", { skipLoading: true }),
-    request("/watchlist/fx/quotes", { skipLoading: true }),
-  ]);
+  const payload = await request("/watchlist/bootstrap", {
+    loadingMessage: "저장된 시세를 불러오는 중입니다...",
+  });
 
-  state.watchlist = watchlist;
-  state.fxWatchlist = fxWatchlist.map((item) => ({
+  state.watchlist = payload.watchlist || [];
+  state.fxWatchlist = (payload.fx_watchlist || []).map((item) => ({
     id: item.id,
     base: item.base_currency,
     target: item.target_currency,
   }));
   state.stockQuotes = Object.fromEntries(
-    stockQuotes.map((quote) => [String(quote.symbol).toUpperCase(), quote])
+    (payload.stock_quotes || []).map((quote) => [String(quote.symbol).toUpperCase(), quote])
   );
   state.fxRates = Object.fromEntries(
-    fxQuotes.map((rate) => [
+    (payload.fx_quotes || []).map((rate) => [
       `${String(rate.base_currency).toUpperCase()}/${String(rate.target_currency).toUpperCase()}`,
       rate,
     ])

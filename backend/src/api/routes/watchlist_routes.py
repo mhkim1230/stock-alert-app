@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.dependencies import get_protected_db
 from src.models.database import FxWatchlistItem, WatchlistItem
 from src.schemas.api import (
+    AppBootstrapResponse,
     FxWatchlistItemCreate,
     FxRateSnapshotResponse,
     FxWatchlistItemResponse,
@@ -53,6 +54,29 @@ async def list_watchlist_quotes(db: AsyncSession = Depends(get_protected_db)):
 @router.get("/fx/quotes", response_model=List[FxRateSnapshotResponse])
 async def list_fx_watchlist_quotes(db: AsyncSession = Depends(get_protected_db)):
     return await fx_watchlist_quote_service.list_snapshots(db)
+
+
+@router.get("/bootstrap", response_model=AppBootstrapResponse)
+async def bootstrap_watchlist_data(db: AsyncSession = Depends(get_protected_db)):
+    watchlist = list((await db.execute(select(WatchlistItem).order_by(WatchlistItem.symbol.asc()))).scalars())
+    fx_watchlist = list(
+        (
+            await db.execute(
+                select(FxWatchlistItem).order_by(
+                    FxWatchlistItem.base_currency.asc(),
+                    FxWatchlistItem.target_currency.asc(),
+                )
+            )
+        ).scalars()
+    )
+    stock_quotes = await watchlist_quote_service.list_snapshots(db)
+    fx_quotes = await fx_watchlist_quote_service.list_snapshots(db)
+    return AppBootstrapResponse(
+        watchlist=watchlist,
+        fx_watchlist=fx_watchlist,
+        stock_quotes=stock_quotes,
+        fx_quotes=fx_quotes,
+    )
 
 
 @router.post("", response_model=WatchlistItemResponse, status_code=status.HTTP_201_CREATED)

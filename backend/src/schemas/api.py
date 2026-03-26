@@ -97,6 +97,13 @@ class FxWatchlistItemResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
+class AppBootstrapResponse(BaseModel):
+    watchlist: List[WatchlistItemResponse]
+    fx_watchlist: List[FxWatchlistItemResponse]
+    stock_quotes: List[StockQuoteSnapshotResponse]
+    fx_quotes: List[FxRateSnapshotResponse]
+
     class Config:
         orm_mode = True
 
